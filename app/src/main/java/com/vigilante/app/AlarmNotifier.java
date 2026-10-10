@@ -44,7 +44,12 @@ public final class AlarmNotifier {
     }
 
     public static void notifyMatch(Context ctx, Watch watch, String preview) {
-        show(ctx, watch.name, "Se detectó el estado: " + watch.keyword
+        String header = "CHANGES".equals(watch.rule) ? "La página ha cambiado"
+                : "DISAPPEARS".equals(watch.rule) ? "El estado ha desaparecido"
+                : "Se detectó el estado esperado";
+        String detail = "CHANGES".equals(watch.rule) ? "Nuevo contenido"
+                : "Objetivo: " + watch.keyword;
+        show(ctx, watch.name + " · " + header, detail
                 + (preview.isEmpty() ? "" : " · " + preview), watch.url, watch.id.hashCode());
     }
 
