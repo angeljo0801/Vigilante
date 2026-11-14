@@ -260,6 +260,9 @@ public final class MainActivity extends Activity {
         int stateColor = MUTED;
         if (!w.enabled) {
             state = "⏸  En pausa";
+        } else if (w.actionRequired) {
+            state = "⚠ Acción requerida · vigilancia en espera";
+            stateColor = Color.rgb(255,190,118);
         } else if (!w.lastError.isEmpty()) {
             state = "⚠  " + w.lastError;
             stateColor = Color.rgb(255, 190, 118);
@@ -289,8 +292,14 @@ public final class MainActivity extends Activity {
         history.setOnClickListener(v -> showHistory(w.id));
         card.addView(history,bottomMargin(dp(43),10));
 
+        if(w.actionRequired) {
+            card.addView(text(w.lastError,13,MUTED,false),bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT,8));
+            Button open=button("Abrir página para verificar",BLUE);
+            open.setOnClickListener(v->openManualPage(w.url,w.id));
+            card.addView(open,bottomMargin(dp(46),8));
+        }
         LinearLayout actions = row();
-        Button check = button("Comprobar", BLUE);
+        Button check = button(w.actionRequired?"Reintentar":"Comprobar", BLUE);
         check.setTextSize(12);
         check.setOnClickListener(v -> checkNow(w.id, check));
         Button edit = button("Editar", CARD);
@@ -336,7 +345,7 @@ public final class MainActivity extends Activity {
         origin.setEnabled(false);
         origin.setText("Revisando...");
         background.execute(() -> {
-            String result = MonitorRunner.check(getApplicationContext(), id);
+            String result = MonitorRunner.check(getApplicationContext(), id, true);
             runOnUiThread(() -> {
                 refreshCards();
                 if (!isFinishing() && !isDestroyed()) {
@@ -379,6 +388,13 @@ public final class MainActivity extends Activity {
         return spinner;
     }
 
+    private void openManualPage(String url,String id) {
+        android.content.Intent i=new android.content.Intent(this,ManualPageActivity.class);
+        i.setData(Uri.parse(url));
+        i.putExtra("watch_id",id);
+        startActivity(i);
+    }
+
     private void showExplorer(String initialUrl) {
         ScrollView scroll = new ScrollView(this);
         LinearLayout form = column();
@@ -393,6 +409,9 @@ public final class MainActivity extends Activity {
         form.addView(analyze,bottomMargin(dp(48),12));
         TextView status = text("Detectaremos datos que se puedan vigilar sin escribir código.",14,MUTED,false);
         form.addView(status,bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT,12));
+        Button verify=button("Abrir página para verificar",CARD);
+        verify.setVisibility(View.GONE);
+        form.addView(verify,bottomMargin(dp(46),10));
         EditText filter = input(form,"Filtrar resultados","","Precio, dólar, título...");
         filter.setVisibility(View.GONE);
         LinearLayout results = column();
@@ -450,7 +469,7 @@ public final class MainActivity extends Activity {
             final boolean dynamic = engine.getSelectedItemPosition()==0;
             final int seconds=waits[wait.getSelectedItemPosition()];
             analyze.setEnabled(false); url.setEnabled(false); engine.setEnabled(false); wait.setEnabled(false);
-            found.clear(); results.removeAllViews(); filter.setVisibility(View.GONE);
+            found.clear(); results.removeAllViews(); filter.setVisibility(View.GONE); verify.setVisibility(View.GONE);
             status.setText(dynamic?"Cargando página y ejecutando JavaScript...":"Analizando HTML...");
             background.execute(() -> {
                 try {
@@ -467,6 +486,11 @@ public final class MainActivity extends Activity {
                         if(!dialog.isShowing()||isDestroyed()) return;
                         analyze.setEnabled(true); url.setEnabled(true); engine.setEnabled(true); wait.setEnabled(true);
                         status.setText("No se pudo analizar: "+(e.getMessage()==null?e.getClass().getSimpleName():e.getMessage()));
+                        if(e instanceof ActionRequired){
+                            verify.setVisibility(View.VISIBLE);
+                            verify.setOnClickListener(vv->openManualPage(target,""));
+                            AlarmNotifier.notifyAction(getApplicationContext(),"Explorador web",target,"explore:"+target,e.getMessage());
+                        }
                     });
                 }
             });
@@ -582,6 +606,7 @@ public final class MainActivity extends Activity {
                             updated.lastChecked = editing.lastChecked;
                             updated.lastAlert = editing.lastAlert;
                             updated.history = editing.history;
+                            updated.actionRequired = editing.actionRequired;
                         }
                     }
 
@@ -599,6 +624,7 @@ public final class MainActivity extends Activity {
                 .setMessage("¿Quieres eliminar \"" + w.name + "\"?")
                 .setNegativeButton("Cancelar", null)
                 .setPositiveButton("Borrar", (dialog, button) -> {
+                    AlarmNotifier.clearAction(this,w.id);
                     WatchStore.remove(this, w.id);
                     Scheduler.cancel(this, w.id);
                     refreshCards();

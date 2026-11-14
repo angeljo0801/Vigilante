@@ -53,6 +53,31 @@ public final class AlarmNotifier {
                 + (preview.isEmpty() ? "" : " · " + preview), watch.url, watch.id.hashCode());
     }
 
+    private static int actionId(String id){return ("action:"+id).hashCode() & 0x7fffffff;}
+    public static void clearAction(Context ctx,String id){
+        NotificationManagerCompat.from(ctx).cancel(actionId(id));
+    }
+    public static void notifyAction(Context ctx,String name,String url,String id,String reason){
+        setup(ctx);
+        if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) return;
+        Intent intent=new Intent(ctx,ManualPageActivity.class);
+        intent.setData(Uri.parse(url));
+        intent.putExtra("watch_id",id);
+        int notificationId=actionId(id);
+        PendingIntent pending=PendingIntent.getActivity(ctx,notificationId,intent,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+        String detail=reason+" Abre la página para revisarlo manualmente.";
+        Notification n=new NotificationCompat.Builder(ctx,CHANNEL)
+            .setSmallIcon(android.R.drawable.ic_dialog_alert)
+            .setContentTitle("Vigilante · Acción requerida: "+name)
+            .setContentText(detail)
+            .setStyle(new NotificationCompat.BigTextStyle().bigText(detail))
+            .setContentIntent(pending).setAutoCancel(true)
+            .addAction(android.R.drawable.ic_menu_view,"Abrir página",pending)
+            .setPriority(NotificationCompat.PRIORITY_HIGH).build();
+        NotificationManagerCompat.from(ctx).notify(notificationId,n);
+    }
+
     public static void test(Context ctx) {
         show(ctx, "Alarma de prueba", "Vigilante puede avisarte cuando detecte un cambio.",
                 null, 500001);

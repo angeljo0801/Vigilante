@@ -45,10 +45,15 @@ public final class RenderedPage {
             Thread.currentThread().interrupt();
             throw new IOException("Consulta cancelada",e);
         }
-        if(session.error.get()!=null) throw new IOException(session.error.get());
+        if(session.error.get()!=null) {
+            if(session.actionRequired.get()) throw new ActionRequired(session.error.get());
+            throw new IOException(session.error.get());
+        }
         String html=session.html.get();
         if(html==null||html.trim().isEmpty()) throw new IOException("El navegador no encontró contenido");
-        return Jsoup.parse(html,session.finalUrl.get()==null?url:session.finalUrl.get());
+        Document doc=Jsoup.parse(html,session.finalUrl.get()==null?url:session.finalUrl.get());
+        ActionRequired.checkDocument(doc);
+        return doc;
     }
     private static final class Session {
         final Context context;
@@ -57,6 +62,7 @@ public final class RenderedPage {
         final Handler handler=new Handler(Looper.getMainLooper());
         final CountDownLatch latch=new CountDownLatch(1);
         final AtomicBoolean done=new AtomicBoolean();
+        final AtomicBoolean actionRequired=new AtomicBoolean();
         final AtomicReference<String> html=new AtomicReference<>(),error=new AtomicReference<>(),finalUrl=new AtomicReference<>();
         WebView view;
         final Runnable capture=this::capture;
@@ -97,7 +103,11 @@ public final class RenderedPage {
                         if(req.isForMainFrame())finish(null,"Error de navegación: "+err.getDescription());
                     }
                     @Override public void onReceivedHttpError(WebView v,WebResourceRequest req,WebResourceResponse res){
-                        if(req.isForMainFrame())finish(null,"El sitio devolvió HTTP "+res.getStatusCode());
+                        if(req.isForMainFrame()){
+                            try { ActionRequired.checkStatus(res.getStatusCode()); }
+                            catch(ActionRequired a){ actionRequired.set(true);finish(null,a.getMessage());return; }
+                            finish(null,"El sitio devolvió HTTP "+res.getStatusCode());
+                        }
                     }
                     @Override public boolean onRenderProcessGone(WebView v,android.webkit.RenderProcessGoneDetail d){
                         finish(null,"El motor del navegador se cerró");return true;

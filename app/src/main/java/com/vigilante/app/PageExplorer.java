@@ -33,7 +33,9 @@ public final class PageExplorer {
         Connection.Response response=Jsoup.connect(url)
             .userAgent("Mozilla/5.0 (compatible; Vigilante/2.1; Android)")
             .timeout(15000).maxBodySize(2000000).followRedirects(true)
-            .ignoreContentType(true).execute();
+            .ignoreContentType(true).ignoreHttpErrors(true).execute();
+        ActionRequired.checkStatus(response.statusCode());
+        if(response.statusCode()<200 || response.statusCode()>=300) throw new IOException("El sitio devolvió HTTP "+response.statusCode());
         String type=response.contentType();
         if(type!=null && !type.toLowerCase(Locale.ROOT).contains("html")) {
             String body=response.body().replaceAll("\\s+"," ").trim();
@@ -42,7 +44,9 @@ public final class PageExplorer {
             list.add(new Candidate("Contenido","Respuesta completa",preview(body),"","",""));
             return list;
         }
-        return discover(response.parse());
+        Document doc=response.parse();
+        ActionRequired.checkDocument(doc);
+        return discover(doc);
     }
     static List<Candidate> discover(Document doc) {
         List<Candidate> out=new ArrayList<>();

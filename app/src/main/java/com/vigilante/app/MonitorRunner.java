@@ -9,10 +9,13 @@ public final class MonitorRunner {
     private MonitorRunner() {}
 
     /** Called on a background thread by WorkManager or the manual-check UI. */
-    public static synchronized String check(Context context, String id) {
+    public static String check(Context context, String id) { return check(context,id,false); }
+
+    public static synchronized String check(Context context, String id, boolean manual) {
         Watch before = WatchStore.find(context, id);
         if (before == null) return "Esta vigilancia ya no existe.";
         if (!before.enabled) return "Esta vigilancia está pausada.";
+        if (before.actionRequired && !manual) return "Esperando intervención manual. No se harán nuevas consultas automáticas.";
 
         long now = System.currentTimeMillis();
         try {
@@ -26,6 +29,7 @@ public final class MonitorRunner {
                         observation.matched, current.lastFingerprint, observation.fingerprint);
                 current.lastChecked = now;
                 current.lastError = "";
+                current.actionRequired = false;
                 current.lastPreview = observation.preview();
                 current.lastMatched = observation.matched;
                 current.lastFingerprint = observation.fingerprint;
@@ -36,12 +40,25 @@ public final class MonitorRunner {
                 updated.set(true);
             });
             if (!updated.get()) return "La vigilancia cambió durante la comprobación; se descartó el resultado.";
+            AlarmNotifier.clearAction(context,id);
             if (triggered.get()) AlarmNotifier.notifyMatch(context, before, observation.preview());
             if (triggered.get()) return "Alerta generada.\n\n" + observation.preview();
             if ("CHANGES".equals(before.rule)) {
                 return "Dato extraído:\n" + observation.preview();
             }
             return "Dato extraído:\n" + observation.preview() + "\n\nCondición: " + (observation.matched ? "cumplida" : "no cumplida");
+        } catch (ActionRequired error) {
+            AtomicBoolean notify=new AtomicBoolean(false);
+            WatchStore.mutate(context,id,current->{
+                if(!current.enabled || !current.sameTargetAs(before)) return;
+                notify.set(!current.actionRequired);
+                current.actionRequired=true;
+                current.lastChecked=now;
+                current.lastError=error.getMessage();
+                record(current,now,"",error.getMessage(),false);
+            });
+            if(notify.get()) AlarmNotifier.notifyAction(context,before.name,before.url,id,error.getMessage());
+            return error.getMessage()+"\n\nLas consultas automáticas quedan en espera. Abre la página y reintenta manualmente solo cuando el sitio lo permita.";
         } catch (Exception error) {
             String message = error.getMessage() == null ? error.toString() : error.getMessage();
             WatchStore.mutate(context, id, current -> {

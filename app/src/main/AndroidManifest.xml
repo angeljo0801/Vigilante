@@ -19,6 +19,7 @@
                 <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED"/>
             </intent-filter>
         </receiver>
+        <activity android:name=".ManualPageActivity" android:exported="false"/>
         <activity
             android:name=".MainActivity"
             android:exported="true">

@@ -21,6 +21,7 @@ public final class Watch {
     public int renderWaitSeconds = 8;
     public JSONArray history = new JSONArray();
     public boolean enabled = true;
+    public boolean actionRequired = false;
     public boolean initialized = false;
     public boolean lastMatched = false;
     public String lastFingerprint = "";
@@ -45,6 +46,7 @@ public final class Watch {
         j.put("renderWaitSeconds", renderWaitSeconds);
         j.put("history", history);
         j.put("enabled", enabled);
+        j.put("actionRequired", actionRequired);
         j.put("initialized", initialized);
         j.put("lastMatched", lastMatched);
         j.put("lastFingerprint", lastFingerprint);
@@ -72,6 +74,7 @@ public final class Watch {
         JSONArray h = j.optJSONArray("history");
         if (h != null) w.history = h;
         w.enabled = j.optBoolean("enabled", true);
+        w.actionRequired = j.optBoolean("actionRequired", false);
         w.initialized = j.optBoolean("initialized", false);
         w.lastMatched = j.optBoolean("lastMatched", false);
         w.lastFingerprint = j.optString("lastFingerprint", "");
@@ -94,6 +97,7 @@ public final class Watch {
     }
 
     public void resetState() {
+        actionRequired = false;
         initialized = false;
         lastMatched = false;
         lastFingerprint = "";

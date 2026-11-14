@@ -48,7 +48,9 @@ public final class WebScanner {
                     .maxBodySize(2_000_000)
                     .followRedirects(true)
                     .ignoreContentType(true)
+                    .ignoreHttpErrors(true)
                     .execute();
+            ActionRequired.checkStatus(response.statusCode());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 throw new IOException("El sitio devolvió HTTP " + response.statusCode());
             }
@@ -66,6 +68,7 @@ public final class WebScanner {
     }
 
     static String extract(Document document, Watch watch) throws IOException {
+        ActionRequired.checkDocument(document);
         String text;
         if (watch.selector.trim().isEmpty()) {
             text = document.body() == null ? "" : document.body().text();
