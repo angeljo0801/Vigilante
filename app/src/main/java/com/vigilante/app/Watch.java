@@ -2,6 +2,7 @@ package com.vigilante.app;
 
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.json.JSONArray;
 import java.util.UUID;
 
 /** User-defined target plus persisted monitoring state. */
@@ -14,6 +15,9 @@ public final class Watch {
     public String attribute = "";
     public String rule = "APPEARS";
     public int intervalMinutes = 15;
+    public String times = "";
+    public String regex = "";
+    public JSONArray history = new JSONArray();
     public boolean enabled = true;
     public boolean initialized = false;
     public boolean lastMatched = false;
@@ -33,6 +37,9 @@ public final class Watch {
         j.put("attribute", attribute);
         j.put("rule", rule);
         j.put("intervalMinutes", intervalMinutes);
+        j.put("times", times);
+        j.put("regex", regex);
+        j.put("history", history);
         j.put("enabled", enabled);
         j.put("initialized", initialized);
         j.put("lastMatched", lastMatched);
@@ -54,6 +61,10 @@ public final class Watch {
         w.attribute = j.optString("attribute", "");
         w.rule = j.optString("rule", "APPEARS");
         w.intervalMinutes = j.optInt("intervalMinutes", 15);
+        w.times = j.optString("times", "");
+        w.regex = j.optString("regex", "");
+        JSONArray h = j.optJSONArray("history");
+        if (h != null) w.history = h;
         w.enabled = j.optBoolean("enabled", true);
         w.initialized = j.optBoolean("initialized", false);
         w.lastMatched = j.optBoolean("lastMatched", false);
@@ -71,7 +82,8 @@ public final class Watch {
                 && keyword.equals(other.keyword)
                 && selector.equals(other.selector)
                 && attribute.equals(other.attribute)
-                && rule.equals(other.rule);
+                && rule.equals(other.rule)
+                && regex.equals(other.regex);
     }
 
     public void resetState() {

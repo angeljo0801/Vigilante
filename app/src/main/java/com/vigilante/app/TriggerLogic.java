@@ -7,7 +7,8 @@ public final class TriggerLogic {
     public static boolean shouldAlert(
             String rule, boolean initialized, boolean previousMatched,
             boolean currentMatched, String previousFingerprint, String currentFingerprint) {
-        if (!initialized) return false; // establish baseline without surprise alert
+        if ("ALWAYS".equals(rule)) return true;
+        if (!initialized) return ("ABOVE".equals(rule) || "BELOW".equals(rule)) && currentMatched; // establish baseline without surprise alert
         if ("DISAPPEARS".equals(rule)) return previousMatched && !currentMatched;
         if ("CHANGES".equals(rule)) return !previousFingerprint.equals(currentFingerprint);
         return !previousMatched && currentMatched;

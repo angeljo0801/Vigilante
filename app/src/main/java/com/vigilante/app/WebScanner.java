@@ -9,6 +9,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Locale;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 
 public final class WebScanner {
     private WebScanner() {}
@@ -36,7 +38,7 @@ public final class WebScanner {
             }
             Connection.Response response = Jsoup.connect(url)
                     .userAgent("Mozilla/5.0 (compatible; Vigilante/1.0; Android)")
-                    .referrer("https://www.google.com/")
+                    
                     .timeout(15000)
                     .maxBodySize(2_000_000)
                     .followRedirects(true)
@@ -69,12 +71,32 @@ public final class WebScanner {
                 }
             }
             text = text.replaceAll("\\s+", " ").trim();
+            if (!watch.regex.isEmpty()) {
+                Matcher m = Pattern.compile(watch.regex, Pattern.CASE_INSENSITIVE).matcher(text);
+                if (!m.find()) throw new IOException("No se encontró el patrón de extracción");
+                text = m.groupCount() > 0 ? m.group(1) : m.group();
+                if (text == null || text.isEmpty()) throw new IOException("Extracción vacía");
+            }
             String search = watch.keyword.trim().toLowerCase(Locale.ROOT);
             boolean matches = !search.isEmpty() && text.toLowerCase(Locale.ROOT).contains(search);
+            if ("ABOVE".equals(watch.rule) || "BELOW".equals(watch.rule)) {
+                try {
+                    double value = number(text), limit = number(watch.keyword);
+                    matches = "ABOVE".equals(watch.rule) ? value > limit : value < limit;
+                } catch (NumberFormatException e) { throw new IOException("Extrae un solo número sin separadores de miles (decimal con punto o coma)."); }
+            }
             return new Observation(text, sha256(text), matches);
         } catch (IllegalArgumentException badSelector) {
             throw new IOException("Selector o dirección no válida: " + badSelector.getMessage(), badSelector);
         }
+    }
+
+    static double number(String text) {
+        String v = text.trim().replace(',', '.');
+        if (!v.matches("[+-]?[0-9]+(\\.[0-9]+)?")) throw new NumberFormatException(v);
+        double n = Double.parseDouble(v);
+        if (!Double.isFinite(n)) throw new NumberFormatException(v);
+        return n;
     }
 
     static String sha256(String value) {

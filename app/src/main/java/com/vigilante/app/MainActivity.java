@@ -41,9 +41,9 @@ public final class MainActivity extends Activity {
     private static final int MUTED = Color.rgb(167, 185, 213);
     private static final int BLUE = Color.rgb(62, 123, 231);
     private static final int GREEN = Color.rgb(99, 221, 173);
-    private static final String[] RULES = {"APPEARS", "DISAPPEARS", "CHANGES"};
-    private static final String[] RULE_LABELS = {"Cuando APARECE", "Cuando DESAPARECE", "Cuando CAMBIA"};
-    private static final Integer[] INTERVALS = {15, 30, 60, 120};
+    private static final String[] RULES = {"APPEARS", "DISAPPEARS", "CHANGES", "ALWAYS", "ABOVE", "BELOW"};
+    private static final String[] RULE_LABELS = {"Cuando APARECE", "Cuando DESAPARECE", "Cuando CAMBIA", "En cada lectura", "Si supera un número", "Si baja de un número"};
+    private static final Integer[] INTERVALS = {15, 30, 60, 120, 360, 720, 1440};
     private final ExecutorService background = Executors.newSingleThreadExecutor();
     private LinearLayout cardList;
     private TextView statistics;
@@ -62,7 +62,7 @@ public final class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (cardList != null) refreshCards();
+        if (cardList != null) { Scheduler.syncAll(this); refreshCards(); }
     }
 
     @Override
@@ -139,7 +139,7 @@ public final class MainActivity extends Activity {
         TextView heading = text("Vigilante", 35, WHITE, true);
         root.addView(heading, bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT, 5));
 
-        TextView sub = text("Tu bot revisa páginas y te avisa cuando sucede lo que esperas.",
+        TextView sub = text("Extrae datos de cualquier web compatible y programa alertas.",
                 15, MUTED, false);
         root.addView(sub, bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT, 23));
 
@@ -148,7 +148,7 @@ public final class MainActivity extends Activity {
         status.setBackground(rounded(CARD, 17, BORDER));
         statistics = text("", 17, WHITE, true);
         status.addView(statistics, bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT, 7));
-        TextView info = text("Vigilancia en segundo plano · Android revisa a intervalos, no al segundo.",
+        TextView info = text("Scraping local · por intervalos u horas diarias. Android puede retrasar las tareas.",
                 12, MUTED, false);
         status.addView(info);
         root.addView(status, bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT, 17));
@@ -156,7 +156,18 @@ public final class MainActivity extends Activity {
         Button add = button("＋  Nueva vigilancia", BLUE);
         add.setTextSize(16);
         add.setOnClickListener(v -> showEditor(null));
-        root.addView(add, bottomMargin(dp(53), 23));
+        root.addView(add, bottomMargin(dp(53), 12));
+        Button refresh = button("Actualizar resultados", CARD);
+        refresh.setOnClickListener(v -> refreshCards());
+        root.addView(refresh, bottomMargin(dp(43), 10));
+        if (Build.VERSION.SDK_INT >= 31) {
+            Button exact = button("Permitir alarmas a la hora elegida", CARD);
+            exact.setOnClickListener(v -> {
+                try { startActivity(new android.content.Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:" + getPackageName()))); }
+                catch (Exception e) { new AlertDialog.Builder(this).setMessage("Configura Alarmas y recordatorios desde Ajustes de Android.").setPositiveButton("Cerrar",null).show(); }
+            });
+            root.addView(exact,bottomMargin(dp(44), 15));
+        }
 
         TextView listHeading = text("MIS VIGILANCIAS", 12, MUTED, true);
         root.addView(listHeading, bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT, 11));
@@ -230,14 +241,14 @@ public final class MainActivity extends Activity {
         url.setMaxLines(2);
         card.addView(url, bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT, 11));
 
-        String trigger = "CHANGES".equals(w.rule) ? "Cambios en el texto/atributo"
-                : ("DISAPPEARS".equals(w.rule) ? "Desaparece: " : "Aparece: ") + w.keyword;
+        int rulePos = Math.max(0, Arrays.asList(RULES).indexOf(w.rule));
+        String trigger = RULE_LABELS[rulePos] + (w.keyword.isEmpty() ? "" : ": " + w.keyword);
         TextView target = text("◎  " + trigger, 14, WHITE, true);
         card.addView(target, bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT, 4));
 
         String scope = w.selector.isEmpty() ? "Página completa" : "Selector: " + w.selector;
         if (!w.attribute.isEmpty()) scope += " · atributo: " + w.attribute;
-        scope += " · cada " + w.intervalMinutes + " min";
+        scope += w.times.isEmpty() ? " · cada " + w.intervalMinutes + " min" : " · diario " + w.times;
         TextView scopeView = text(scope, 12, MUTED, false);
         card.addView(scopeView, bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT, 10));
 
@@ -250,11 +261,11 @@ public final class MainActivity extends Activity {
             stateColor = Color.rgb(255, 190, 118);
         } else if (!w.initialized) {
             state = "◌  Esperando primera comprobación";
-        } else if ("CHANGES".equals(w.rule)) {
+        } else if ("CHANGES".equals(w.rule) || "ALWAYS".equals(w.rule)) {
             state = "✓  Estado inicial registrado";
             stateColor = GREEN;
         } else {
-            state = w.lastMatched ? "✓  Palabra presente" : "○  Palabra no detectada";
+            state = w.lastMatched ? "✓  Condición cumplida" : "○  Condición no cumplida";
             if (w.lastMatched) stateColor = GREEN;
         }
         TextView status = text(state, 13, stateColor, true);
@@ -264,7 +275,15 @@ public final class MainActivity extends Activity {
                 : "Última revisión: " + new SimpleDateFormat("dd/MM HH:mm", Locale.getDefault())
                         .format(new Date(w.lastChecked));
         TextView date = text(when, 12, MUTED, false);
-        card.addView(date, bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT, 13));
+        card.addView(date, bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT, 8));
+        if (!w.lastPreview.isEmpty()) card.addView(text("Dato: " + w.lastPreview, 14, WHITE, false),bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT, 8));
+        if (w.enabled && !w.times.isEmpty()) {
+            long next = Scheduler.nextTime(w.times,System.currentTimeMillis());
+            card.addView(text("Próxima: " + new SimpleDateFormat("dd/MM HH:mm",Locale.getDefault()).format(new Date(next)),12,MUTED,false));
+        }
+        Button history = button("Historial de extracciones (" + w.history.length() + ")", CARD);
+        history.setOnClickListener(v -> showHistory(w.id));
+        card.addView(history,bottomMargin(dp(43),10));
 
         LinearLayout actions = row();
         Button check = button("Comprobar", BLUE);
@@ -285,6 +304,28 @@ public final class MainActivity extends Activity {
         }
         card.addView(actions);
         cardList.addView(card, bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT, 12));
+    }
+
+    private void showHistory(String id) {
+        Watch w = WatchStore.find(this,id);
+        if (w == null) return;
+        StringBuilder out = new StringBuilder();
+        SimpleDateFormat fmt = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss",Locale.getDefault());
+        for (int i=0;i<w.history.length();i++) {
+            org.json.JSONObject h=w.history.optJSONObject(i);
+            if(h==null) continue;
+            out.append(fmt.format(new Date(h.optLong("time"))));
+            if(h.optBoolean("alert")) out.append(" · ALERTA");
+            out.append("\n");
+            String error=h.optString("error");
+            out.append(error.isEmpty()?h.optString("value"):"Error: "+error).append("\n\n");
+        }
+        String result=out.length()==0?"Sin lecturas todavía.":out.toString();
+        new AlertDialog.Builder(this).setTitle("Historial · "+w.name).setMessage(result)
+            .setNeutralButton("Copiar",(d,v)->{
+                android.content.ClipboardManager cb=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
+                cb.setPrimaryClip(android.content.ClipData.newPlainText("Historial",result));
+            }).setPositiveButton("Cerrar",null).show();
     }
 
     private void checkNow(String id, Button origin) {
@@ -345,12 +386,14 @@ public final class MainActivity extends Activity {
         EditText url = input(form, "Dirección web (URL)",
                 editing == null ? "" : editing.url, "https://sitio.com/producto");
         url.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
-        EditText keyword = input(form, "Palabra o estado que buscas",
+        EditText keyword = input(form, "Palabra, estado o umbral numérico",
                 editing == null ? "" : editing.keyword, "Disponible, Entregado, En stock...");
         EditText css = input(form, "Selector CSS (opcional)",
                 editing == null ? "" : editing.selector, ".estado o #disponibilidad");
         EditText attribute = input(form, "Atributo HTML (opcional)",
                 editing == null ? "" : editing.attribute, "aria-label, class, data-status...");
+        EditText regex = input(form, "Patrón de extracción (regex, opcional)",
+                editing == null ? "" : editing.regex, "Ej.: USD\\s*([0-9]+)");
         TextView tip = text("Si dejas el selector vacío, Vigilante revisa el texto de toda la web. "
                         + "Para detectar un icono o señal HTML, señala su elemento y atributo.",
                 12, MUTED, false);
@@ -359,12 +402,13 @@ public final class MainActivity extends Activity {
         int ruleIndex = editing == null ? 0 : Arrays.asList(RULES).indexOf(editing.rule);
         Spinner rule = spinner(form, "Avísame cuando...", RULE_LABELS, ruleIndex);
 
-        String[] intervalLabels = {"15 minutos", "30 minutos", "1 hora", "2 horas"};
+        String[] intervalLabels = {"15 minutos", "30 minutos", "1 hora", "2 horas", "6 horas", "12 horas", "24 horas"};
         int intervalIndex = editing == null ? 0 : Arrays.asList(INTERVALS).indexOf(editing.intervalMinutes);
         Spinner interval = spinner(form, "Intervalo de comprobación", intervalLabels, intervalIndex);
 
-        TextView first = text("La primera comprobación registra el estado sin lanzar una alarma. "
-                + "Las siguientes te alertarán cuando ocurra la transición seleccionada.",
+        EditText times = input(form, "Horas diarias (opcional; reemplazan intervalo)",
+                editing == null ? "" : editing.times, "08:00, 12:00, 18:30");
+        TextView first = text("Usa formato 24 h. Para números, extrae un único valor sin separadores de miles. Las reglas de cambio registran una lectura inicial; Cada lectura avisa siempre. Android puede retrasar el acceso a la red.",
                 12, MUTED, false);
         form.addView(first);
 
@@ -389,7 +433,7 @@ public final class MainActivity extends Activity {
                     String phrase = keyword.getText().toString().trim();
                     String selector = css.getText().toString().trim();
                     String attr = attribute.getText().toString().trim();
-                    if (!"CHANGES".equals(selectedRule) && phrase.isEmpty()) {
+                    if (!"CHANGES".equals(selectedRule) && !"ALWAYS".equals(selectedRule) && phrase.isEmpty()) {
                         keyword.setError("Indica qué palabra o estado quieres detectar.");
                         return;
                     }
@@ -398,7 +442,17 @@ public final class MainActivity extends Activity {
                         return;
                     }
 
+                    String schedule, pattern=regex.getText().toString().trim();
+                    try { schedule=Scheduler.normalizeTimes(times.getText().toString()); }
+                    catch (IllegalArgumentException e) { times.setError(e.getMessage()); return; }
+                    try { if (!pattern.isEmpty()) java.util.regex.Pattern.compile(pattern); }
+                    catch (Exception e) { regex.setError("Patrón no válido"); return; }
+                    if ("ABOVE".equals(selectedRule) || "BELOW".equals(selectedRule)) {
+                        try { WebScanner.number(phrase); } catch (Exception e) { keyword.setError("Introduce un número, sin separadores de miles"); return; }
+                    }
                     Watch updated = new Watch();
+                    updated.times=schedule;
+                    updated.regex=pattern;
                     if (editing != null) updated.id = editing.id;
                     updated.name = name.getText().toString().trim();
                     if (updated.name.isEmpty()) updated.name = uri.getHost();
@@ -418,6 +472,7 @@ public final class MainActivity extends Activity {
                             updated.lastError = editing.lastError;
                             updated.lastChecked = editing.lastChecked;
                             updated.lastAlert = editing.lastAlert;
+                            updated.history = editing.history;
                         }
                     }
 

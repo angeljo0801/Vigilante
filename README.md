@@ -41,3 +41,12 @@ GitHub Actions compila automáticamente en cada push a main y cuando ejecutas el
 - Selector #precio + CAMBIA: alerta cuando el texto de ese elemento se modifique.
 
 No se incluyen cuentas, contraseñas ni claves en el repositorio.
+
+## Versión 2.0 — Scraping programado
+- Horas diarias locales HH:mm separadas por comas, o intervalos de 15 min a 24 h.
+- Extracción por CSS, atributo, texto/JSON y regex opcional (primer grupo capturado o coincidencia completa).
+- Alertas en cada lectura, cambios, aparición, desaparición y cruce de umbral numérico. El umbral también avisa en la primera lectura si se cumple.
+- Historial local de 50 lecturas por vigilancia, hasta 8000 caracteres cada una, incluyendo errores; botón copiar y actualización del dashboard.
+- AlarmManager programa la hora; WorkManager ejecuta con red. Activa Alarmas y recordatorios en Android para mayor precisión. No garantiza puntualidad, especialmente sin conexión, con ahorro de batería o teléfono apagado. Tras reinicio se reprograman las tareas.
+- No requiere servidor ni suscripción. Solo sitios accesibles por HTTP(S), respetando permisos, términos y límites. No ejecuta JS dinámico ni elude CAPTCHA.
+- Conserva applicationId y configuración anterior; la instalación sobre una versión existente requiere la misma firma.
