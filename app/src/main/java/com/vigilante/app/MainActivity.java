@@ -153,7 +153,11 @@ public final class MainActivity extends Activity {
         status.addView(info);
         root.addView(status, bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT, 17));
 
-        Button add = button("＋  Nueva vigilancia", BLUE);
+        Button explore = button("Explorar una página web", BLUE);
+        explore.setTextSize(16);
+        explore.setOnClickListener(v -> showExplorer(""));
+        root.addView(explore, bottomMargin(dp(53), 12));
+        Button add = button("＋  Nueva vigilancia manual", CARD);
         add.setTextSize(16);
         add.setOnClickListener(v -> showEditor(null));
         root.addView(add, bottomMargin(dp(53), 12));
@@ -375,31 +379,120 @@ public final class MainActivity extends Activity {
         return spinner;
     }
 
-    private void showEditor(Watch editing) {
+    private void showExplorer(String initialUrl) {
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout form = column();
+        form.setPadding(dp(20),dp(16),dp(20),dp(12));
+        scroll.addView(form);
+        EditText url = input(form,"URL de la página",initialUrl,"https://ejemplo.com");
+        url.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        Button analyze = button("Analizar página",BLUE);
+        form.addView(analyze,bottomMargin(dp(48),12));
+        TextView status = text("Detectaremos datos que se puedan vigilar sin escribir código.",14,MUTED,false);
+        form.addView(status,bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT,12));
+        EditText filter = input(form,"Filtrar resultados","","Precio, dólar, título...");
+        filter.setVisibility(View.GONE);
+        LinearLayout results = column();
+        form.addView(results);
+        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Explorador web")
+            .setView(scroll).setNegativeButton("Cerrar",null).create();
+        final java.util.List<PageExplorer.Candidate> found = new java.util.ArrayList<>();
+        final String[] analyzedUrl = {""};
+        Runnable render = () -> {
+            results.removeAllViews();
+            String query=filter.getText().toString().trim().toLowerCase(Locale.ROOT);
+            int visible=0;
+            for(PageExplorer.Candidate c: found) {
+                if(!query.isEmpty() && !(c.category+" "+c.label+" "+c.value).toLowerCase(Locale.ROOT).contains(query)) continue;
+                visible++;
+                LinearLayout item=column();
+                item.setPadding(dp(12),dp(12),dp(12),dp(12));
+                item.setBackground(rounded(CARD,12,BORDER));
+                item.addView(text(c.category+" · "+c.label,14,GREEN,true));
+                item.addView(text(c.value,15,WHITE,false),bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT,8));
+                Button select=button("Vigilar este dato",BLUE);
+                select.setOnClickListener(v -> {
+                    Watch draft=new Watch();
+                    draft.name=c.label;
+                    draft.url=analyzedUrl[0];
+                    draft.selector=c.selector;
+                    draft.attribute=c.attribute;
+                    draft.regex=c.regex;
+                    draft.rule="CHANGES";
+                    showEditor(null,draft);
+                });
+                item.addView(select,bottomMargin(dp(42),0));
+                results.addView(item,bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT,10));
+            }
+            if(visible==0) results.addView(text("No hay coincidencias con el filtro.",14,MUTED,false));
+        };
+        filter.addTextChangedListener(new android.text.TextWatcher() {
+            public void beforeTextChanged(CharSequence s,int start,int count,int after) {}
+            public void onTextChanged(CharSequence s,int start,int before,int count) { if(!found.isEmpty()) render.run(); }
+            public void afterTextChanged(android.text.Editable s) {}
+        });
+        analyze.setOnClickListener(v -> {
+            String web=url.getText().toString().trim();
+            if(!web.contains("://")) web="https://"+web;
+            final String target=web;
+            Uri uri=Uri.parse(target);
+            if(uri.getHost()==null || !("https".equalsIgnoreCase(uri.getScheme())||"http".equalsIgnoreCase(uri.getScheme()))) {
+                url.setError("Introduce una URL HTTP o HTTPS válida"); return;
+            }
+            url.setText(target);
+            analyze.setEnabled(false); url.setEnabled(false);
+            found.clear(); results.removeAllViews(); filter.setVisibility(View.GONE);
+            status.setText("Analizando contenido de la página...");
+            background.execute(() -> {
+                try {
+                    java.util.List<PageExplorer.Candidate> candidates=PageExplorer.inspect(target);
+                    runOnUiThread(() -> {
+                        if(!dialog.isShowing()||isDestroyed()) return;
+                        analyze.setEnabled(true); url.setEnabled(true);
+                        found.addAll(candidates); analyzedUrl[0]=target;
+                        status.setText(found.isEmpty()?"No se encontraron datos compatibles. Puede que el sitio necesite JavaScript.":found.size()+" datos detectados. Elige uno para configurar su vigilancia.");
+                        if(!found.isEmpty()) { filter.setVisibility(View.VISIBLE); filter.setText(""); render.run(); }
+                    });
+                } catch(Exception e) {
+                    runOnUiThread(() -> {
+                        if(!dialog.isShowing()||isDestroyed()) return;
+                        analyze.setEnabled(true); url.setEnabled(true);
+                        status.setText("No se pudo analizar: "+(e.getMessage()==null?e.getClass().getSimpleName():e.getMessage()));
+                    });
+                }
+            });
+        });
+        dialog.show();
+    }
+
+    private void showEditor(Watch editing) { showEditor(editing, null); }
+
+    private void showEditor(Watch editing, Watch draft) {
+        final Watch seed = editing != null ? editing : draft;
         ScrollView scroll = new ScrollView(this);
         LinearLayout form = column();
         form.setPadding(dp(20), dp(18), dp(20), dp(7));
         scroll.addView(form);
 
         EditText name = input(form, "Nombre de la vigilancia",
-                editing == null ? "" : editing.name, "Por ejemplo: Producto disponible");
+                seed == null ? "" : seed.name, "Por ejemplo: Producto disponible");
         EditText url = input(form, "Dirección web (URL)",
-                editing == null ? "" : editing.url, "https://sitio.com/producto");
+                seed == null ? "" : seed.url, "https://sitio.com/producto");
         url.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
         EditText keyword = input(form, "Palabra, estado o umbral numérico",
-                editing == null ? "" : editing.keyword, "Disponible, Entregado, En stock...");
+                seed == null ? "" : seed.keyword, "Disponible, Entregado, En stock...");
         EditText css = input(form, "Selector CSS (opcional)",
-                editing == null ? "" : editing.selector, ".estado o #disponibilidad");
+                seed == null ? "" : seed.selector, ".estado o #disponibilidad");
         EditText attribute = input(form, "Atributo HTML (opcional)",
-                editing == null ? "" : editing.attribute, "aria-label, class, data-status...");
+                seed == null ? "" : seed.attribute, "aria-label, class, data-status...");
         EditText regex = input(form, "Patrón de extracción (regex, opcional)",
-                editing == null ? "" : editing.regex, "Ej.: USD\\s*([0-9]+)");
-        TextView tip = text("Si dejas el selector vacío, Vigilante revisa el texto de toda la web. "
+                seed == null ? "" : seed.regex, "Ej.: USD\\s*([0-9]+)");
+        TextView tip = text("Los campos técnicos se rellenan automáticamente desde el explorador. Si dejas el selector vacío, Vigilante revisa el texto de toda la web. "
                         + "Para detectar un icono o señal HTML, señala su elemento y atributo.",
                 12, MUTED, false);
         form.addView(tip, bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT, 17));
 
-        int ruleIndex = editing == null ? 0 : Arrays.asList(RULES).indexOf(editing.rule);
+        int ruleIndex = seed == null ? 0 : Arrays.asList(RULES).indexOf(seed.rule);
         Spinner rule = spinner(form, "Avísame cuando...", RULE_LABELS, ruleIndex);
 
         String[] intervalLabels = {"15 minutos", "30 minutos", "1 hora", "2 horas", "6 horas", "12 horas", "24 horas"};
@@ -407,7 +500,7 @@ public final class MainActivity extends Activity {
         Spinner interval = spinner(form, "Intervalo de comprobación", intervalLabels, intervalIndex);
 
         EditText times = input(form, "Horas diarias (opcional; reemplazan intervalo)",
-                editing == null ? "" : editing.times, "08:00, 12:00, 18:30");
+                seed == null ? "" : seed.times, "08:00, 12:00, 18:30");
         TextView first = text("Usa formato 24 h. Para números, extrae un único valor sin separadores de miles. Las reglas de cambio registran una lectura inicial; Cada lectura avisa siempre. Android puede retrasar el acceso a la red.",
                 12, MUTED, false);
         form.addView(first);
