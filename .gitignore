@@ -5,3 +5,8 @@
 /app/build
 *.iml
 .DS_Store
+
+*.jks
+*.keystore
+*.p12
+*.keystore.b64

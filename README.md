@@ -15,7 +15,7 @@ Vigilante te avisa cuando una página pública cumple una condición. Puedes cre
 - Guarda la configuración localmente en tu dispositivo.
 
 ## Cómo usarla
-1. Instala la APK de depuración creada por GitHub Actions (pestaña Actions, flujo "Compilar APK Android", archivo descargable de la ejecución).
+1. Instala la APK firmada creada por GitHub Actions (pestaña Actions, flujo "Compilar APK Android", archivo descargable de la ejecución).
 2. Abre Vigilante, permite las notificaciones y toca "Nueva vigilancia".
 3. Escribe una URL completa como https://ejemplo.com/producto y un texto como "Disponible".
 4. Si el sitio contiene textos repetidos, añade un selector CSS específico para su estado.
@@ -31,7 +31,7 @@ Vigilante te avisa cuando una página pública cumple una condición. Puedes cre
 
 ## Compilar
 Proyecto Android Java. Abre esta carpeta en Android Studio para sincronizar con Gradle, o usa una instalación de Gradle 8.9 y JDK 17:
-    gradle :app:assembleDebug
+    gradle :app:assembleDebug  # solo pruebas locales; no distribuir
 
 GitHub Actions compila automáticamente en cada push a main y cuando ejecutas el flujo manualmente. Descarga el artefacto Vigilante-APK de la ejecución completada.
 
@@ -50,3 +50,6 @@ No se incluyen cuentas, contraseñas ni claves en el repositorio.
 - AlarmManager programa la hora; WorkManager ejecuta con red. Activa Alarmas y recordatorios en Android para mayor precisión. No garantiza puntualidad, especialmente sin conexión, con ahorro de batería o teléfono apagado. Tras reinicio se reprograman las tareas.
 - No requiere servidor ni suscripción. Solo sitios accesibles por HTTP(S), respetando permisos, términos y límites. No ejecuta JS dinámico ni elude CAPTCHA.
 - Conserva applicationId y configuración anterior; la instalación sobre una versión existente requiere la misma firma.
+
+## Firma permanente de actualizaciones (2.0.1+)
+Configura cuatro secretos de Actions: ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS y ANDROID_KEY_PASSWORD. Usa siempre el mismo almacén y alias. Conserva una copia privada fuera del repositorio. El flujo falla explícitamente si faltan secretos, nunca publica una APK firmada con una clave temporal. Para generar una nueva clave o reutilizar una existente, ejecuta tools/setup-signing.ps1 en Windows con Java y GitHub CLI instalados. La clave anterior es imprescindible si deseas actualizar una APK ya instalada con esa firma; una nueva clave no puede reemplazarla. El ID de aplicación se mantiene com.vigilante.app.
