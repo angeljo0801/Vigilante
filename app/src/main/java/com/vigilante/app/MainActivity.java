@@ -194,8 +194,8 @@ public final class MainActivity extends Activity {
         });
         root.addView(test, bottomMargin(dp(46), 18));
 
-        TextView foot = text("Las páginas que necesitan inicio de sesión, CAPTCHA o JavaScript dinámico "
-                + "requieren una modalidad de vigilancia desde servidor.", 12, MUTED, false);
+        TextView foot = text("Las páginas con inicio de sesión, CAPTCHA o contenido protegido "
+                + "pueden impedir la extracción. JavaScript está disponible en el motor navegador.", 12, MUTED, false);
         root.addView(foot);
         refreshCards();
     }
@@ -250,7 +250,7 @@ public final class MainActivity extends Activity {
         TextView target = text("◎  " + trigger, 14, WHITE, true);
         card.addView(target, bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT, 4));
 
-        String scope = w.selector.isEmpty() ? "Página completa" : "Selector: " + w.selector;
+        String scope = (w.dynamic ? "JavaScript · " : "HTML · ") + (w.selector.isEmpty() ? "Página completa" : "Selector: " + w.selector);
         if (!w.attribute.isEmpty()) scope += " · atributo: " + w.attribute;
         scope += w.times.isEmpty() ? " · cada " + w.intervalMinutes + " min" : " · diario " + w.times;
         TextView scopeView = text(scope, 12, MUTED, false);
@@ -386,6 +386,9 @@ public final class MainActivity extends Activity {
         scroll.addView(form);
         EditText url = input(form,"URL de la página",initialUrl,"https://ejemplo.com");
         url.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        Spinner engine = spinner(form,"Motor de análisis",new String[]{"Navegador con JavaScript (recomendado)","HTML directo (rápido)"},0);
+        Spinner wait = spinner(form,"Espera después de cargar JavaScript",new String[]{"3 segundos","8 segundos","15 segundos","25 segundos"},1);
+        final int[] waits={3,8,15,25};
         Button analyze = button("Analizar página",BLUE);
         form.addView(analyze,bottomMargin(dp(48),12));
         TextView status = text("Detectaremos datos que se puedan vigilar sin escribir código.",14,MUTED,false);
@@ -398,6 +401,8 @@ public final class MainActivity extends Activity {
             .setView(scroll).setNegativeButton("Cerrar",null).create();
         final java.util.List<PageExplorer.Candidate> found = new java.util.ArrayList<>();
         final String[] analyzedUrl = {""};
+        final boolean[] analyzedDynamic = {true};
+        final int[] analyzedWait = {8};
         Runnable render = () -> {
             results.removeAllViews();
             String query=filter.getText().toString().trim().toLowerCase(Locale.ROOT);
@@ -419,6 +424,8 @@ public final class MainActivity extends Activity {
                     draft.attribute=c.attribute;
                     draft.regex=c.regex;
                     draft.rule="CHANGES";
+                    draft.dynamic=analyzedDynamic[0];
+                    draft.renderWaitSeconds=analyzedWait[0];
                     showEditor(null,draft);
                 });
                 item.addView(select,bottomMargin(dp(42),0));
@@ -440,23 +447,25 @@ public final class MainActivity extends Activity {
                 url.setError("Introduce una URL HTTP o HTTPS válida"); return;
             }
             url.setText(target);
-            analyze.setEnabled(false); url.setEnabled(false);
+            final boolean dynamic = engine.getSelectedItemPosition()==0;
+            final int seconds=waits[wait.getSelectedItemPosition()];
+            analyze.setEnabled(false); url.setEnabled(false); engine.setEnabled(false); wait.setEnabled(false);
             found.clear(); results.removeAllViews(); filter.setVisibility(View.GONE);
-            status.setText("Analizando contenido de la página...");
+            status.setText(dynamic?"Cargando página y ejecutando JavaScript...":"Analizando HTML...");
             background.execute(() -> {
                 try {
-                    java.util.List<PageExplorer.Candidate> candidates=PageExplorer.inspect(target);
+                    java.util.List<PageExplorer.Candidate> candidates=dynamic ? PageExplorer.discover(RenderedPage.load(getApplicationContext(),target,seconds)) : PageExplorer.inspect(target);
                     runOnUiThread(() -> {
                         if(!dialog.isShowing()||isDestroyed()) return;
-                        analyze.setEnabled(true); url.setEnabled(true);
-                        found.addAll(candidates); analyzedUrl[0]=target;
-                        status.setText(found.isEmpty()?"No se encontraron datos compatibles. Puede que el sitio necesite JavaScript.":found.size()+" datos detectados. Elige uno para configurar su vigilancia.");
+                        analyze.setEnabled(true); url.setEnabled(true); engine.setEnabled(true); wait.setEnabled(true);
+                        found.addAll(candidates); analyzedUrl[0]=target; analyzedDynamic[0]=dynamic; analyzedWait[0]=seconds;
+                        status.setText(found.isEmpty()?"No se encontraron datos compatibles. Prueba otra espera o motor.":found.size()+" datos detectados. Elige uno para configurar su vigilancia.");
                         if(!found.isEmpty()) { filter.setVisibility(View.VISIBLE); filter.setText(""); render.run(); }
                     });
                 } catch(Exception e) {
                     runOnUiThread(() -> {
                         if(!dialog.isShowing()||isDestroyed()) return;
-                        analyze.setEnabled(true); url.setEnabled(true);
+                        analyze.setEnabled(true); url.setEnabled(true); engine.setEnabled(true); wait.setEnabled(true);
                         status.setText("No se pudo analizar: "+(e.getMessage()==null?e.getClass().getSimpleName():e.getMessage()));
                     });
                 }
@@ -492,6 +501,11 @@ public final class MainActivity extends Activity {
                 12, MUTED, false);
         form.addView(tip, bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT, 17));
 
+        Spinner engine = spinner(form,"Motor de extracción",new String[]{"HTML directo","Navegador con JavaScript"},seed != null && seed.dynamic ? 1 : 0);
+        final int[] waitOptions={3,8,15,25};
+        int waitIndex=1;
+        if(seed!=null) for(int i=0;i<waitOptions.length;i++) if(waitOptions[i]==seed.renderWaitSeconds) waitIndex=i;
+        Spinner renderWait = spinner(form,"Espera JavaScript",new String[]{"3 segundos","8 segundos","15 segundos","25 segundos"},waitIndex);
         int ruleIndex = seed == null ? 0 : Arrays.asList(RULES).indexOf(seed.rule);
         Spinner rule = spinner(form, "Avísame cuando...", RULE_LABELS, ruleIndex);
 
@@ -546,6 +560,8 @@ public final class MainActivity extends Activity {
                     Watch updated = new Watch();
                     updated.times=schedule;
                     updated.regex=pattern;
+                    updated.dynamic=engine.getSelectedItemPosition()==1;
+                    updated.renderWaitSeconds=waitOptions[renderWait.getSelectedItemPosition()];
                     if (editing != null) updated.id = editing.id;
                     updated.name = name.getText().toString().trim();
                     if (updated.name.isEmpty()) updated.name = uri.getHost();

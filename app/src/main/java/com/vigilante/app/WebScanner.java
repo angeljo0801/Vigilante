@@ -1,5 +1,6 @@
 package com.vigilante.app;
 
+import android.content.Context;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -30,11 +31,15 @@ public final class WebScanner {
         }
     }
 
-    public static Observation scan(Watch watch) throws IOException {
+    public static Observation scan(Context context, Watch watch) throws IOException {
         try {
             String url = watch.url.trim();
             if (!(url.startsWith("http://") || url.startsWith("https://"))) {
                 throw new IOException("La dirección debe empezar por https:// o http://");
+            }
+            if (watch.dynamic) {
+                Document rendered = RenderedPage.load(context, url, watch.renderWaitSeconds);
+                return observe(watch, extract(rendered, watch));
             }
             Connection.Response response = Jsoup.connect(url)
                     .userAgent("Mozilla/5.0 (compatible; Vigilante/1.0; Android)")
@@ -52,24 +57,37 @@ public final class WebScanner {
             if (watch.selector.trim().isEmpty() && !contentType.contains("html")) {
                 text = response.body(); // JSON/plain-text APIs can also be monitored.
             } else {
-                Document document = response.parse();
-                if (watch.selector.trim().isEmpty()) {
-                    text = document.body() == null ? "" : document.body().text();
-                } else {
-                    Elements selected = document.select(watch.selector.trim());
-                    if (selected.isEmpty()) {
-                        throw new IOException("No se encontró el selector CSS: " + watch.selector);
-                    }
-                    StringBuilder buf = new StringBuilder();
-                    for (Element element : selected) {
-                        String part = watch.attribute.trim().isEmpty()
-                                ? element.text() : element.attr(watch.attribute.trim());
-                        if (buf.length() > 0) buf.append(" | ");
-                        buf.append(part);
-                    }
-                    text = buf.toString();
-                }
+                text = extract(response.parse(), watch);
             }
+            return observe(watch,text);
+        } catch (IllegalArgumentException badSelector) {
+            throw new IOException("Selector o dirección no válida: " + badSelector.getMessage(), badSelector);
+        }
+    }
+
+    static String extract(Document document, Watch watch) throws IOException {
+        String text;
+        if (watch.selector.trim().isEmpty()) {
+            text = document.body() == null ? "" : document.body().text();
+        } else {
+            Elements selected = document.select(watch.selector.trim());
+            if (selected.isEmpty()) {
+                throw new IOException("No se encontró el selector CSS: " + watch.selector);
+            }
+            StringBuilder buf = new StringBuilder();
+            for (Element element : selected) {
+                String part = watch.attribute.trim().isEmpty()
+                        ? element.text() : element.attr(watch.attribute.trim());
+                if (buf.length() > 0) buf.append(" | ");
+                buf.append(part);
+            }
+            text = buf.toString();
+        }
+        return text;
+    }
+
+    static Observation observe(Watch watch, String text) throws IOException {
+        try {
             text = text.replaceAll("\\s+", " ").trim();
             if (!watch.regex.isEmpty()) {
                 Matcher m = Pattern.compile(watch.regex, Pattern.CASE_INSENSITIVE).matcher(text);

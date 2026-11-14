@@ -17,6 +17,8 @@ public final class Watch {
     public int intervalMinutes = 15;
     public String times = "";
     public String regex = "";
+    public boolean dynamic = false;
+    public int renderWaitSeconds = 8;
     public JSONArray history = new JSONArray();
     public boolean enabled = true;
     public boolean initialized = false;
@@ -39,6 +41,8 @@ public final class Watch {
         j.put("intervalMinutes", intervalMinutes);
         j.put("times", times);
         j.put("regex", regex);
+        j.put("dynamic", dynamic);
+        j.put("renderWaitSeconds", renderWaitSeconds);
         j.put("history", history);
         j.put("enabled", enabled);
         j.put("initialized", initialized);
@@ -63,6 +67,8 @@ public final class Watch {
         w.intervalMinutes = j.optInt("intervalMinutes", 15);
         w.times = j.optString("times", "");
         w.regex = j.optString("regex", "");
+        w.dynamic = j.optBoolean("dynamic", false);
+        w.renderWaitSeconds = Math.max(3, Math.min(25, j.optInt("renderWaitSeconds", 8)));
         JSONArray h = j.optJSONArray("history");
         if (h != null) w.history = h;
         w.enabled = j.optBoolean("enabled", true);
@@ -83,7 +89,8 @@ public final class Watch {
                 && selector.equals(other.selector)
                 && attribute.equals(other.attribute)
                 && rule.equals(other.rule)
-                && regex.equals(other.regex);
+                && regex.equals(other.regex)
+                && dynamic == other.dynamic && renderWaitSeconds == other.renderWaitSeconds;
     }
 
     public void resetState() {

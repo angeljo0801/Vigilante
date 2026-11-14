@@ -17,7 +17,7 @@ import java.util.regex.Matcher;
 /** Heuristic discovery of public HTML fields. Every proposed selector is verified
  * against the same document, using the same extraction semantics as WebScanner. */
 public final class PageExplorer {
-    private static final int LIMIT = 100;
+    private static final int LIMIT = 200;
     private static final Pattern NUMBER=Pattern.compile("(?<![\\p{L}\\d])([+-]?\\d+(?:[.,]\\d+)?)(?![\\p{L}\\d])");
     private static final Pattern PRICE=Pattern.compile("(?i)[$€£]|\\b(?:USD|CUP|EUR|precio|price|cost|importe)\\b");
     private static final Pattern STATUS=Pattern.compile("(?i)\\b(?:disponible|agotado|en stock|sin stock|available|unavailable|in stock|out of stock|sold out|availability|disponibilidad|entregado)\\b");
@@ -58,7 +58,7 @@ public final class PageExplorer {
             add(doc,out,seen,e,attr,cat,hint.trim().isEmpty()?cat:hint.trim(),value);
         }
         for(Element e:doc.select("body *")) {
-            if(out.size()>=55) break;
+            if(out.size()>=100) break;
             if(ignored(e)) continue;
             String own=e.ownText().trim(), all=e.text().trim();
             if(all.isEmpty()||all.length()>180) continue;
@@ -68,13 +68,14 @@ public final class PageExplorer {
             if(own.isEmpty() && e.childrenSize()>1 && all.length()>100) continue;
             add(doc,out,seen,e,"",cat,cat,all);
         }
-        for(Element e:doc.select("title, h1, h2, h3, h4, time, tr, dt, dd, p, a[href], button, [aria-label]")) {
+        for(Element e:doc.select("title, h1, h2, h3, h4, time, tr, dt, dd, p, a[href], button, [aria-label], td, li, span, div, strong, label")) {
             if(out.size()>=LIMIT) break;
             if(ignored(e)) continue;
             String val=e.text().trim();
             String attr="";
             if(val.isEmpty()&&e.hasAttr("aria-label")) {attr="aria-label";val=e.attr(attr);}
             if(val.isEmpty()||val.length()>800) continue;
+            if((e.tagName().equals("span")||e.tagName().equals("div")) && e.ownText().trim().isEmpty()) continue;
             String cat=category(e.className()+" "+e.id()+" "+val,e);
             add(doc,out,seen,e,attr,cat,cat,val);
         }
@@ -107,7 +108,7 @@ public final class PageExplorer {
         } catch(Exception ex){return;}
         String val=value(e,attr);
         if(val.isEmpty())return;
-        String identity=cat+"|"+val;
+        String identity=selector+"|"+attr;
         if(!seen.add(identity))return;
         String friendly=label.trim();
         if(friendly.isEmpty()||friendly.equals(cat)) friendly=cat+" · "+preview(val,45);

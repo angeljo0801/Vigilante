@@ -16,7 +16,7 @@ public final class MonitorRunner {
 
         long now = System.currentTimeMillis();
         try {
-            WebScanner.Observation observation = WebScanner.scan(before);
+            WebScanner.Observation observation = WebScanner.scan(context, before);
             AtomicBoolean triggered = new AtomicBoolean(false);
             AtomicBoolean updated = new AtomicBoolean(false);
             WatchStore.mutate(context, id, current -> {
