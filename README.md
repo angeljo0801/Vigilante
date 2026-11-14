@@ -85,3 +85,6 @@ Hasta seis accesos independientes de Android Quick Settings. Cada uno puede apun
 
 ## 3.5.1 — Corrección del icono de ajustes rápidos
 Los accesos pasan al modo no activo de TileService: SystemUI puede enlazarlos cada vez que abre el panel. Se redibujan desde el almacenamiento local al iniciar la escucha y cuando reciben cambios mientras el panel está abierto. El icono usa un PNG independiente con el valor más grande, recupera lecturas anteriores guardadas y muestra `—` sin dato o `?` sin asignación en lugar del gráfico genérico. No vuelve a consultar la web al abrir el panel. El formato final depende de Samsung; las pruebas de compilación no garantizan el comportamiento de SystemUI de cada modelo.
+
+## 3.5.2 — Corrección de pruebas de acceso rápido
+Una vigilancia sin lectura inicial no consulta su historial para decidir si contiene un valor. Se mantiene la recuperación de la vista previa de lecturas válidas y la protección contra mostrar datos viejos de una configuración reiniciada. Las pruebas de 3.5.1 se mantienen.

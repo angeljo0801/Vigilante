@@ -49,9 +49,9 @@ public final class QuickValue {
         // Passive tiles refresh every time SystemUI opens. Notify currently listening tiles too.
         c.sendBroadcast(new android.content.Intent(ACTION_REFRESH).setPackage(c.getPackageName()));
     }
-    static boolean hasReading(Watch w){return w!=null&&(w.initialized||w.lastNumericAt>0||lastValid(w)!=null);}
+    static boolean hasReading(Watch w){return w!=null&&(w.initialized||w.lastNumericAt>0);}
     private static org.json.JSONObject lastValid(Watch w){
-        if(w==null)return null;
+        if(!hasReading(w)||w.history==null)return null;
         for(int i=0;i<w.history.length();i++){
             org.json.JSONObject row=w.history.optJSONObject(i);
             if(row!=null&&row.has("value")&&row.optString("error").isEmpty())return row;
