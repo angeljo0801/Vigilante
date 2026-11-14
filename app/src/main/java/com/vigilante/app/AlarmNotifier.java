@@ -78,6 +78,10 @@ public final class AlarmNotifier {
         NotificationManagerCompat.from(ctx).notify(notificationId,n);
     }
 
+    public static void notifyInbox(Context ctx,Watch watch,boolean ready){
+        show(ctx,ready?"Nueva vigilancia de ChatGPT":"Búsqueda recibida · revisar",
+            watch.name+" · "+(ready?"Alarma configurada":"Falta seleccionar o validar el dato"),null,("inbox:"+watch.id).hashCode());
+    }
     public static void test(Context ctx) {
         show(ctx, "Alarma de prueba", "Vigilante puede avisarte cuando detecte un cambio.",
                 null, 500001);

@@ -14,6 +14,16 @@ public final class TaskImport {
         try{URI u=new URI(s);return ("https".equalsIgnoreCase(u.getScheme())||"http".equalsIgnoreCase(u.getScheme()))&&u.getHost()!=null&&u.getUserInfo()==null;}
         catch(Exception e){return false;}
     }
+    static boolean readyForAuto(Watch w,String raw){
+        if(!raw.trim().startsWith("VIGILANTE/1") || !validUrl(w.url))return false;
+        if(w.times.isEmpty()&&!Pattern.compile("(?im)^INTERVALO\\s*:").matcher(raw).find())return false;
+        if(!w.attribute.isEmpty()&&w.selector.isEmpty())return false;
+        if(w.selector.isEmpty()&&w.regex.isEmpty()&&w.keyword.isEmpty())return false;
+        if(("CHANGES".equals(w.rule)||"ALWAYS".equals(w.rule))&&w.selector.isEmpty()&&w.regex.isEmpty())return false;
+        if(!"CHANGES".equals(w.rule)&&!"ALWAYS".equals(w.rule)&&w.keyword.isEmpty())return false;
+        if("ABOVE".equals(w.rule)||"BELOW".equals(w.rule)){try{WebScanner.number(w.keyword);}catch(Exception ex){return false;}}
+        return true;
+    }
     public static Watch parse(String raw){
         if(raw==null||raw.trim().isEmpty())throw new IllegalArgumentException("Pega una configuración o un enlace.");
         if(raw.length()>20000)throw new IllegalArgumentException("Texto demasiado largo.");

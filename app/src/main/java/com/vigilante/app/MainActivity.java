@@ -73,7 +73,7 @@ public final class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (cardList != null) { Scheduler.syncAll(this); refreshCards(); }
+        if (cardList != null) { Scheduler.syncAll(this); refreshCards(); ChatInbox.requestNow(this); }
     }
 
     @Override
@@ -175,6 +175,9 @@ public final class MainActivity extends Activity {
         Button importTask=button("Importar búsqueda de ChatGPT",BLUE);
         importTask.setOnClickListener(v->showImport(""));
         root.addView(importTask,bottomMargin(dp(48),12));
+        Button direct = button("Conectar ChatGPT · envío directo",BLUE);
+        direct.setOnClickListener(v->showChatInbox());
+        root.addView(direct,bottomMargin(dp(48),12));
         Button bridge = button("Configurar Playwright remoto", CARD);
         bridge.setOnClickListener(v -> showBridgeSettings());
         root.addView(bridge,bottomMargin(dp(44),10));
@@ -249,6 +252,7 @@ public final class MainActivity extends Activity {
         Switch toggle = new Switch(this);
         toggle.setContentDescription(w.enabled ? "Pausar vigilancia" : "Activar vigilancia");
         toggle.setChecked(w.enabled);
+        toggle.setEnabled(!w.inboxDraft);
         toggle.setOnCheckedChangeListener((b, isOn) -> {
             WatchStore.mutate(this, w.id, item -> item.enabled = isOn);
             Watch updated = WatchStore.find(this, w.id);
@@ -276,7 +280,10 @@ public final class MainActivity extends Activity {
 
         String state;
         int stateColor = MUTED;
-        if (!w.enabled) {
+        if(w.inboxDraft){
+            state="⚠ Borrador recibido · selecciona el dato y guarda";
+            stateColor=Color.rgb(255,190,118);
+        } else if (!w.enabled) {
             state = "⏸  En pausa";
         } else if (w.actionRequired) {
             state = "⚠ Acción requerida · vigilancia en espera";
@@ -317,9 +324,9 @@ public final class MainActivity extends Activity {
             card.addView(open,bottomMargin(dp(46),8));
         }
         LinearLayout actions = row();
-        Button check = button(w.actionRequired?"Reintentar":"Comprobar", BLUE);
+        Button check = button(w.inboxDraft?"Elegir dato":w.actionRequired?"Reintentar":"Comprobar", BLUE);
         check.setTextSize(12);
-        check.setOnClickListener(v -> checkNow(w.id, check));
+        check.setOnClickListener(v -> {if(w.inboxDraft)showExplorer(w.url,w);else checkNow(w.id, check);});
         Button edit = button("Editar", CARD);
         edit.setOnClickListener(v -> {
             Watch latest = WatchStore.find(this, w.id);
@@ -436,6 +443,25 @@ public final class MainActivity extends Activity {
         });dialog.show();
     }
 
+    private void showChatInbox(){
+        LinearLayout form=column();form.setPadding(dp(20),dp(16),dp(20),dp(12));
+        form.addView(text("Vincula este teléfono una vez enviando su código público a ChatGPT. Los envíos viajan cifrados por GitHub y solo este teléfono los puede leer. Si activas la recepción, las configuraciones completas se guardan y programan automáticamente; las incompletas quedan como borradores.",14,MUTED,false),bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT,12));
+        Switch enabled=new Switch(this);enabled.setText("Autorizar recepción automática");enabled.setTextColor(WHITE);enabled.setChecked(ChatInbox.enabled(this));
+        enabled.setOnCheckedChangeListener((v,on)->ChatInbox.enable(this,on));form.addView(enabled,bottomMargin(dp(48),10));
+        Button copy=button("Copiar código de vinculación",BLUE);form.addView(copy,bottomMargin(dp(48),10));
+        TextView status=text(ChatInbox.lastStatus(this),13,MUTED,false);form.addView(status,bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT,10));
+        Button sync=button("Sincronizar ahora",CARD);form.addView(sync,bottomMargin(dp(46),8));
+        copy.setOnClickListener(v->{copy.setEnabled(false);background.execute(()->{
+            try{String code=ChatInbox.pairingCode();runOnUiThread(()->{android.content.ClipboardManager cb=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);cb.setPrimaryClip(android.content.ClipData.newPlainText("Vigilante pairing",code));copy.setEnabled(true);status.setText("Código público copiado. Pégalo en ChatGPT.");});}
+            catch(Exception ex){runOnUiThread(()->{copy.setEnabled(true);status.setText("No se pudo generar el código: "+ex.getMessage());});}
+        });});
+        sync.setOnClickListener(v->{sync.setEnabled(false);status.setText("Sincronizando...");background.execute(()->{
+            String result;try{result=ChatInbox.sync(getApplicationContext());}catch(Exception ex){result=ChatInbox.status(getApplicationContext(),"Error: "+ex.getMessage());}
+            final String msg=result;runOnUiThread(()->{sync.setEnabled(true);status.setText(msg);refreshCards();});
+        });});
+        new AlertDialog.Builder(this).setTitle("Envío directo de ChatGPT").setView(form).setPositiveButton("Cerrar",null).show();
+    }
+
     private void showImport(String initial){
         ScrollView scroll=new ScrollView(this);
         LinearLayout form=column();form.setPadding(dp(20),dp(16),dp(20),dp(12));scroll.addView(form);
@@ -520,7 +546,7 @@ public final class MainActivity extends Activity {
                     draft.preferredEngine=itemFound.engine;
                     draft.dynamic=!"HTML".equals(itemFound.engine);
                     draft.renderWaitSeconds=analyzedWait[0];
-                    showEditor(null,draft);
+                    if(imported!=null&&imported.inboxDraft)showEditor(imported,draft);else showEditor(null,draft);
                 });
                 item.addView(select,bottomMargin(dp(42),0));
                 results.addView(item,bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT,10));
@@ -576,7 +602,7 @@ public final class MainActivity extends Activity {
     private void showEditor(Watch editing) { showEditor(editing, null); }
 
     private void showEditor(Watch editing, Watch draft) {
-        final Watch seed = editing != null ? editing : draft;
+        final Watch seed = draft != null ? draft : editing;
         ScrollView scroll = new ScrollView(this);
         LinearLayout form = column();
         form.setPadding(dp(20), dp(18), dp(20), dp(7));
@@ -676,7 +702,7 @@ public final class MainActivity extends Activity {
                     updated.rule = selectedRule;
                     updated.intervalMinutes = INTERVALS[interval.getSelectedItemPosition()];
                     if (editing != null) {
-                        updated.enabled = editing.enabled;
+                        updated.enabled = editing.inboxDraft || editing.enabled;
                         if (editing.sameTargetAs(updated)) {
                             updated.initialized = editing.initialized;
                             updated.lastMatched = editing.lastMatched;
@@ -690,6 +716,9 @@ public final class MainActivity extends Activity {
                         }
                     }
 
+                    if(editing!=null && editing.inboxDraft && updated.selector.isEmpty()&&updated.regex.isEmpty()&&updated.keyword.isEmpty()){
+                        css.setError("Selecciona el dato que quieres vigilar o indica una palabra.");return;
+                    }
                     WatchStore.upsert(this, updated);
                     Scheduler.schedule(this, updated);
                     refreshCards();
