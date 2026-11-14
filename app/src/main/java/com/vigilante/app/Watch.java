@@ -10,6 +10,11 @@ public final class Watch {
     public String id = UUID.randomUUID().toString();
     public String name = "";
     public String objective = "";
+    public boolean pinNumeric = true;
+    public String numericUnit = "";
+    public String lastNumeric = "";
+    public String previousNumeric = "";
+    public long lastNumericAt = 0;
     public boolean inboxDraft = false;
     public String url = "";
     public String keyword = "";
@@ -39,6 +44,11 @@ public final class Watch {
         j.put("id", id);
         j.put("name", name);
         j.put("objective", objective);
+        j.put("pinNumeric", pinNumeric);
+        j.put("numericUnit", numericUnit);
+        j.put("lastNumeric", lastNumeric);
+        j.put("previousNumeric", previousNumeric);
+        j.put("lastNumericAt", lastNumericAt);
         j.put("inboxDraft", inboxDraft);
         j.put("url", url);
         j.put("keyword", keyword);
@@ -70,6 +80,11 @@ public final class Watch {
         w.id = j.optString("id", w.id);
         w.name = j.optString("name", "");
         w.objective = j.optString("objective", "");
+        w.pinNumeric = j.optBoolean("pinNumeric", true);
+        w.numericUnit = j.optString("numericUnit", "");
+        w.lastNumeric = j.optString("lastNumeric", "");
+        w.previousNumeric = j.optString("previousNumeric", "");
+        w.lastNumericAt = j.optLong("lastNumericAt", 0);
         w.inboxDraft = j.optBoolean("inboxDraft", false);
         w.url = j.optString("url", "");
         w.keyword = j.optString("keyword", "");
@@ -110,6 +125,7 @@ public final class Watch {
 
     public void resetState() {
         actionRequired = false;
+        lastNumeric = ""; previousNumeric = ""; lastNumericAt = 0;
         initialized = false;
         lastMatched = false;
         lastFingerprint = "";

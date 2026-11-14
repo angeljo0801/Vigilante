@@ -42,12 +42,16 @@ public final class TaskImport {
             if(line.isEmpty())continue;
             int colon=line.indexOf(':');if(colon<=0)throw new IllegalArgumentException("Línea no válida: "+line);
             String key=line.substring(0,colon).trim().toUpperCase(Locale.ROOT);
-            if(!Arrays.asList("NOMBRE","URL","OBJETIVO","REGLA","PALABRA","HORAS","INTERVALO","MOTOR","CSS","ATRIBUTO","REGEX","ESPERA").contains(key))throw new IllegalArgumentException("Campo desconocido: "+key);
+            if(!Arrays.asList("NOMBRE","URL","OBJETIVO","REGLA","PALABRA","HORAS","INTERVALO","MOTOR","CSS","ATRIBUTO","REGEX","ESPERA","UNIDAD","FIJAR").contains(key))throw new IllegalArgumentException("Campo desconocido: "+key);
             if(fields.put(key,line.substring(colon+1).trim())!=null)throw new IllegalArgumentException("Campo repetido: "+key);
         }
         w.name=fields.getOrDefault("NOMBRE","Búsqueda importada");w.url=fields.getOrDefault("URL","");
         if(!w.url.isEmpty()&&!validUrl(w.url))throw new IllegalArgumentException("URL HTTP/HTTPS no válida.");
         w.objective=fields.getOrDefault("OBJETIVO","");
+        w.numericUnit=fields.getOrDefault("UNIDAD","");if(w.numericUnit.length()>20)throw new IllegalArgumentException("Unidad demasiado larga");
+        String pin=fields.getOrDefault("FIJAR","SI").toUpperCase(Locale.ROOT);
+        if(!Arrays.asList("SI","SÍ","NO").contains(pin))throw new IllegalArgumentException("FIJAR debe ser SI o NO");
+        w.pinNumeric=!"NO".equals(pin);
         w.rule=fields.getOrDefault("REGLA","CHANGES").toUpperCase(Locale.ROOT);
         if(!Arrays.asList("CHANGES","ALWAYS","APPEARS","DISAPPEARS","ABOVE","BELOW").contains(w.rule))throw new IllegalArgumentException("Regla desconocida.");
         w.keyword=fields.getOrDefault("PALABRA","");w.selector=fields.getOrDefault("CSS","");w.attribute=fields.getOrDefault("ATRIBUTO","");w.regex=fields.getOrDefault("REGEX","");

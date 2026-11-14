@@ -31,6 +31,7 @@ public final class MonitorRunner {
                 current.lastError = "";
                 current.actionRequired = false;
                 current.lastPreview = observation.preview();
+                NumericTrend.record(current,observation.observed,now);
                 current.lastMatched = observation.matched;
                 current.lastFingerprint = observation.fingerprint;
                 current.initialized = true;
@@ -41,12 +42,15 @@ public final class MonitorRunner {
             });
             if (!updated.get()) return "La vigilancia cambió durante la comprobación; se descartó el resultado.";
             AlarmNotifier.clearAction(context,id);
-            if (triggered.get()) AlarmNotifier.notifyMatch(context, before, observation.preview());
-            if (triggered.get()) return "Alerta generada.\n\n" + observation.preview();
+            Watch latest=WatchStore.find(context,id);
+            if(latest!=null){AlarmNotifier.refreshValue(context,latest);if(triggered.get())AlarmNotifier.notifyMatch(context,latest,observation.preview());}
+            String trend=latest==null?"":NumericTrend.detail(latest);
+            String result=observation.preview()+(trend.isEmpty()?"":"\n"+trend);
+            if (triggered.get()) return "Alerta generada.\n\n" + result;
             if ("CHANGES".equals(before.rule)) {
-                return "Dato extraído:\n" + observation.preview();
+                return "Dato extraído:\n" + result;
             }
-            return "Dato extraído:\n" + observation.preview() + "\n\nCondición: " + (observation.matched ? "cumplida" : "no cumplida");
+            return "Dato extraído:\n" + result + "\n\nCondición: " + (observation.matched ? "cumplida" : "no cumplida");
         } catch (ActionRequired error) {
             AtomicBoolean notify=new AtomicBoolean(false);
             WatchStore.mutate(context,id,current->{
@@ -57,6 +61,7 @@ public final class MonitorRunner {
                 current.lastError=error.getMessage();
                 record(current,now,"",error.getMessage(),false);
             });
+            AlarmNotifier.refreshValue(context,WatchStore.find(context,id));
             if(notify.get()) AlarmNotifier.notifyAction(context,before.name,before.url,id,error.getMessage());
             return error.getMessage()+"\n\nLas consultas automáticas quedan en espera. Abre la página y reintenta manualmente solo cuando el sitio lo permita.";
         } catch (Exception error) {
@@ -67,6 +72,7 @@ public final class MonitorRunner {
                 current.lastError = message;
                 record(current, now, "", message, false);
             });
+            AlarmNotifier.refreshValue(context,WatchStore.find(context,id));
             return "Error al consultar la web: " + message;
         }
     }

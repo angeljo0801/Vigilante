@@ -67,6 +67,7 @@ public final class Scheduler {
         WorkManager.getInstance(c).enqueueUniqueWork(uniqueName(w.id)+"_clock",ExistingWorkPolicy.KEEP,req);
     }
     public static void schedule(Context c, Watch w) {
+        AlarmNotifier.refreshValue(c,w);
         if (!w.enabled) { cancel(c,w.id); return; }
         if (!w.times.isEmpty()) {
             WorkManager.getInstance(c).cancelUniqueWork(uniqueName(w.id));

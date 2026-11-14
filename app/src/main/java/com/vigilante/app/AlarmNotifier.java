@@ -18,12 +18,18 @@ import androidx.core.content.ContextCompat;
 
 public final class AlarmNotifier {
     private static final String CHANNEL = "vigilante_alarm_v1";
+    private static final String VALUE_CHANNEL = "vigilante_values_v1";
 
     private AlarmNotifier() {}
 
     public static void setup(Context ctx) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationManager nm = ctx.getSystemService(NotificationManager.class);
+            if(nm.getNotificationChannel(VALUE_CHANNEL)==null){
+                NotificationChannel values=new NotificationChannel(VALUE_CHANNEL,"Valores actuales fijados",NotificationManager.IMPORTANCE_LOW);
+                values.setDescription("Último valor numérico y su cambio, sin sonido adicional");
+                values.setShowBadge(false);nm.createNotificationChannel(values);
+            }
             if (nm.getNotificationChannel(CHANNEL) != null) return;
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL, "Alarmas de Vigilante", NotificationManager.IMPORTANCE_HIGH);
@@ -49,10 +55,40 @@ public final class AlarmNotifier {
                 : "Se detectó el estado esperado";
         String detail = ("CHANGES".equals(watch.rule) || "ALWAYS".equals(watch.rule)) ? "Nuevo contenido"
                 : "Objetivo: " + watch.keyword;
+        if(!watch.lastNumeric.isEmpty()) detail=watch.lastNumeric+" · "+NumericTrend.detail(watch);
         show(ctx, watch.name + " · " + header, detail
-                + (preview.isEmpty() ? "" : " · " + preview), watch.url, watch.id.hashCode());
+                + (preview.isEmpty() || !watch.lastNumeric.isEmpty() ? "" : " · " + preview), watch.url, watch.id.hashCode());
     }
 
+    public static void clearValue(Context ctx,String id){
+        NotificationManagerCompat.from(ctx).cancel("numeric:"+id,1);
+    }
+    public static void refreshValue(Context ctx,Watch watch){
+        if(watch==null)return;
+        if(!watch.enabled||watch.inboxDraft||!watch.pinNumeric||watch.lastNumeric.isEmpty()){
+            clearValue(ctx,watch.id);return;
+        }
+        setup(ctx);
+        if(Build.VERSION.SDK_INT>=33&&ContextCompat.checkSelfPermission(ctx,Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)return;
+        String when=new java.text.SimpleDateFormat("dd/MM HH:mm",java.util.Locale.getDefault()).format(new java.util.Date(watch.lastNumericAt));
+        String direction=NumericTrend.detail(watch);
+        String status=watch.lastError.isEmpty()?"Lectura: "+when:"Último dato válido: "+when+" · No se pudo actualizar";
+        if(watch.actionRequired)status="Último dato válido: "+when+" · Acción requerida";
+        Intent open=new Intent(ctx,MainActivity.class);
+        open.setData(Uri.parse("vigilante://value/"+watch.id));open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        PendingIntent pending=PendingIntent.getActivity(ctx,0,open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+        Notification n=new NotificationCompat.Builder(ctx,VALUE_CHANNEL)
+            .setSmallIcon(android.R.drawable.ic_menu_info_details)
+            .setContentTitle(watch.lastNumeric+" · "+watch.name)
+            .setContentText(direction+" · "+status)
+            .setStyle(new NotificationCompat.BigTextStyle().bigText(direction+"\n"+status))
+            .setSubText(watch.name)
+            .setContentIntent(pending).setWhen(watch.lastNumericAt).setShowWhen(true)
+            .setOngoing(true).setAutoCancel(false).setOnlyAlertOnce(true)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setPriority(NotificationCompat.PRIORITY_LOW).build();
+        NotificationManagerCompat.from(ctx).notify("numeric:"+watch.id,1,n);
+    }
     private static int actionId(String id){return ("action:"+id).hashCode() & 0x7fffffff;}
     public static void clearAction(Context ctx,String id){
         NotificationManagerCompat.from(ctx).cancel(actionId(id));

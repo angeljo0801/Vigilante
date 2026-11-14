@@ -309,6 +309,12 @@ public final class MainActivity extends Activity {
         TextView date = text(when, 12, MUTED, false);
         card.addView(date, bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT, 8));
         if (!w.lastPreview.isEmpty()) card.addView(text("Dato: " + w.lastPreview, 14, WHITE, false),bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT, 8));
+        if(!w.lastNumeric.isEmpty()){
+            String trend=NumericTrend.detail(w);
+            int color=trend.startsWith("↑")?GREEN:trend.startsWith("↓")?Color.rgb(255,125,125):MUTED;
+            card.addView(text(w.lastNumeric+" · "+trend,15,color,true),bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT,8));
+        }
+        if(w.pinNumeric)card.addView(text("Valor fijado en notificaciones cuando sea numérico",12,MUTED,false),bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT,8));
         if (w.enabled && !w.times.isEmpty()) {
             long next = Scheduler.nextTime(w.times,System.currentTimeMillis());
             card.addView(text("Próxima: " + new SimpleDateFormat("dd/MM HH:mm",Locale.getDefault()).format(new Date(next)),12,MUTED,false));
@@ -536,7 +542,7 @@ public final class MainActivity extends Activity {
                 select.setOnClickListener(v -> {
                     Watch draft=new Watch();
                     draft.name=imported==null?c.label:imported.name+" · "+c.label;
-                    if(imported!=null){draft.objective=imported.objective;draft.times=imported.times;draft.intervalMinutes=imported.intervalMinutes;draft.keyword=imported.keyword;}
+                    if(imported!=null){draft.objective=imported.objective;draft.times=imported.times;draft.intervalMinutes=imported.intervalMinutes;draft.keyword=imported.keyword;draft.pinNumeric=imported.pinNumeric;draft.numericUnit=imported.numericUnit;}
                     draft.url=analyzedUrl[0];
                     draft.selector=c.selector;
                     draft.attribute=c.attribute;
@@ -614,6 +620,8 @@ public final class MainActivity extends Activity {
                 seed == null ? "" : seed.url, "https://sitio.com/producto");
         url.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
         EditText objective = input(form,"Objetivo / nota (opcional)",seed==null?"":seed.objective,"Qué información deseas vigilar");
+        Switch pin=new Switch(this);pin.setText("Fijar valor numérico en notificaciones");pin.setTextColor(WHITE);pin.setChecked(seed==null||seed.pinNumeric);form.addView(pin,bottomMargin(dp(48),10));
+        EditText unit=input(form,"Unidad del valor (opcional)",seed==null?"":seed.numericUnit,"CUP, USD, %, etc.");
         EditText keyword = input(form, "Palabra, estado o umbral numérico",
                 seed == null ? "" : seed.keyword, "Disponible, Entregado, En stock...");
         EditText css = input(form, "Selector CSS (opcional)",
@@ -694,6 +702,8 @@ public final class MainActivity extends Activity {
                     if (editing != null) updated.id = editing.id;
                     updated.name = name.getText().toString().trim();
                     updated.objective=objective.getText().toString().trim();
+                    updated.pinNumeric=pin.isChecked();updated.numericUnit=unit.getText().toString().trim();
+                    if(updated.numericUnit.length()>20){unit.setError("Máximo 20 caracteres");return;}
                     if (updated.name.isEmpty()) updated.name = uri.getHost();
                     updated.url = web;
                     updated.keyword = phrase;
@@ -713,6 +723,9 @@ public final class MainActivity extends Activity {
                             updated.lastAlert = editing.lastAlert;
                             updated.history = editing.history;
                             updated.actionRequired = editing.actionRequired;
+                            if(NumericTrend.unitHint(editing).equals(NumericTrend.unitHint(updated))){
+                                updated.lastNumeric=editing.lastNumeric;updated.previousNumeric=editing.previousNumeric;updated.lastNumericAt=editing.lastNumericAt;
+                            }
                         }
                     }
 
@@ -734,11 +747,17 @@ public final class MainActivity extends Activity {
                 .setNegativeButton("Cancelar", null)
                 .setPositiveButton("Borrar", (dialog, button) -> {
                     AlarmNotifier.clearAction(this,w.id);
+                    AlarmNotifier.clearValue(this,w.id);
                     WatchStore.remove(this, w.id);
                     Scheduler.cancel(this, w.id);
                     refreshCards();
                 })
                 .show();
+    }
+
+    @Override public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] grantResults){
+        super.onRequestPermissionsResult(requestCode,permissions,grantResults);
+        if(requestCode==301)for(Watch w:WatchStore.all(this))AlarmNotifier.refreshValue(this,w);
     }
 
     private void askNotificationPermission() {
