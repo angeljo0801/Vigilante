@@ -57,11 +57,16 @@ public final class MainActivity extends Activity {
         Scheduler.syncAll(this);
         createDashboard();
         askNotificationPermission();
-        if(state==null) receiveImport(getIntent());
+        if(state==null) handleIncoming(getIntent());
     }
 
     @Override protected void onNewIntent(android.content.Intent intent){
-        super.onNewIntent(intent);setIntent(intent);receiveImport(intent);
+        super.onNewIntent(intent);setIntent(intent);handleIncoming(intent);
+    }
+
+    private void handleIncoming(android.content.Intent intent){
+        if(intent!=null&&"com.vigilante.app.OPEN_QUICK_VALUE".equals(intent.getAction())){showQuickDetail(Math.max(0,Math.min(QuickValue.SLOTS-1,intent.getIntExtra("quick_slot",0))));return;}
+        receiveImport(intent);
     }
 
     private void receiveImport(android.content.Intent intent){
@@ -178,7 +183,7 @@ public final class MainActivity extends Activity {
         Button direct = button("Conectar ChatGPT · envío directo",BLUE);
         direct.setOnClickListener(v->showChatInbox());
         root.addView(direct,bottomMargin(dp(48),12));
-        Button quick=button("Añadir precio al panel de control",BLUE);
+        Button quick=button("Añadir alertas al panel de control",BLUE);
         quick.setOnClickListener(v->showQuickValue());
         root.addView(quick,bottomMargin(dp(48),12));
         Button bridge = button("Configurar Playwright remoto", CARD);
@@ -350,6 +355,7 @@ public final class MainActivity extends Activity {
             actions.addView(controls[i], p);
         }
         card.addView(actions);
+        if(!w.inboxDraft){Button quickPin=button("Añadir esta alerta al panel",CARD);quickPin.setOnClickListener(v->chooseQuickSlot(w.id));card.addView(quickPin,bottomMargin(dp(44),0));}
         cardList.addView(card, bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT, 12));
     }
 
@@ -453,27 +459,42 @@ public final class MainActivity extends Activity {
     }
 
     private void showQuickValue(){
+        chooseQuickSlot(null);
+    }
+
+    private void chooseQuickSlot(String preferredId){
+        String[] labels=new String[QuickValue.SLOTS];
+        for(int i=0;i<labels.length;i++){
+            Watch w=QuickValue.chosen(this,i);
+            labels[i]="Alerta "+(i+1)+" · "+(w==null?"Sin asignar":w.name);
+        }
+        new AlertDialog.Builder(this).setTitle("Accesos de Vigilante")
+            .setItems(labels,(d,i)->configureQuickSlot(i,preferredId))
+            .setNegativeButton("Cerrar",null).show();
+    }
+
+    private void configureQuickSlot(int slot,String preferredId){
         java.util.ArrayList<Watch> choices=new java.util.ArrayList<>();
         for(Watch w:WatchStore.all(this))if(!w.inboxDraft)choices.add(w);
-        if(choices.isEmpty()){new AlertDialog.Builder(this).setMessage("Crea primero una vigilancia numérica.").setPositiveButton("Cerrar",null).show();return;}
-        String[] labels=new String[choices.size()+1];labels[0]="Automático · USD/CUP preferido";
-        String current=QuickValue.selectedId(this);int initial=0;
+        if(choices.isEmpty()){new AlertDialog.Builder(this).setMessage("Crea primero una vigilancia. Puede devolver cualquier dato.").setPositiveButton("Cerrar",null).show();return;}
+        String[] labels=new String[choices.size()+1];labels[0]=slot==0?"Automático · última lectura":"Sin asignar";
+        String current=preferredId==null?QuickValue.selectedId(this,slot):preferredId;int initial=0;
         for(int i=0;i<choices.size();i++){
-            Watch w=choices.get(i);labels[i+1]=w.name+(w.lastNumeric.isEmpty()?" · Sin lectura":" · "+w.lastNumeric);
+            Watch w=choices.get(i);labels[i+1]=w.name+" · "+QuickValue.compact(QuickValue.value(w),60);
             if(w.id.equals(current))initial=i+1;
         }
         final int[] selected={initial};
-        new AlertDialog.Builder(this).setTitle("Precio en ajustes rápidos")
+        new AlertDialog.Builder(this).setTitle("Alerta "+(slot+1)+" en ajustes rápidos")
             .setSingleChoiceItems(labels,initial,(d,i)->selected[0]=i)
             .setNegativeButton("Cancelar",null)
-            .setNeutralButton("Guardar selección",(d,v)->QuickValue.select(this,selected[0]==0?"":choices.get(selected[0]-1).id))
+            .setNeutralButton("Guardar selección",(d,v)->QuickValue.select(this,slot,selected[0]==0?"":choices.get(selected[0]-1).id))
             .setPositiveButton("Añadir al panel",(d,v)->{
-                QuickValue.select(this,selected[0]==0?"":choices.get(selected[0]-1).id);
+                QuickValue.select(this,slot,selected[0]==0?"":choices.get(selected[0]-1).id);
                 if(Build.VERSION.SDK_INT>=33){
                     try{
                         android.app.StatusBarManager manager=getSystemService(android.app.StatusBarManager.class);
-                        manager.requestAddTileService(new android.content.ComponentName(this,ValueTileService.class),
-                            "Vigilante · Precio",android.graphics.drawable.Icon.createWithResource(this,R.drawable.ic_qs_value),
+                        manager.requestAddTileService(new android.content.ComponentName(this,QuickValue.service(slot)),
+                            "Vigilante · Alerta "+(slot+1),android.graphics.drawable.Icon.createWithResource(this,R.drawable.ic_qs_value),
                             getMainExecutor(),result->{
                                 if(result==android.app.StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED||result==android.app.StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED){
                                     QuickValue.request(this);
@@ -485,9 +506,25 @@ public final class MainActivity extends Activity {
             }).show();
     }
 
+    private void showQuickDetail(int slot){
+        Watch w=QuickValue.chosen(this,slot);
+        if(w==null){configureQuickSlot(slot,null);return;}
+        String value=QuickValue.value(w);
+        long time=0;
+        for(int i=0;i<w.history.length();i++){
+            org.json.JSONObject h=w.history.optJSONObject(i);
+            if(h!=null&&h.optString("error").isEmpty()){value=h.optString("value",value);time=h.optLong("time");break;}
+        }
+        String when=time==0?"":("\nÚltima lectura válida: "+new SimpleDateFormat("dd/MM HH:mm",Locale.getDefault()).format(new Date(time)));
+        new AlertDialog.Builder(this).setTitle(w.name).setMessage(value+"\n\n"+QuickValue.subtitle(w)+when)
+            .setNegativeButton("Cerrar",null)
+            .setNeutralButton("Cambiar alerta",(d,v)->configureQuickSlot(slot,null))
+            .setPositiveButton("Historial",(d,v)->showHistory(w.id)).show();
+    }
+
     private void showQuickInstructions(){
         new AlertDialog.Builder(this).setTitle("Añadir Vigilante al panel")
-            .setMessage("Desliza para abrir los ajustes rápidos, pulsa el lápiz de edición y busca Vigilante · Precio entre los accesos disponibles. Arrástralo a la posición deseada. Android decide el tamaño y si muestra las etiquetas.")
+            .setMessage("Desliza para abrir los ajustes rápidos, pulsa el lápiz de edición y busca Vigilante · Alerta 1 a 6. Arrastra los accesos que quieras. Android decide el tamaño y si muestra las etiquetas; los textos largos se acortan en el icono y se pueden leer al tocarlo.")
             .setPositiveButton("Entendido",null).show();
     }
 
@@ -760,6 +797,7 @@ public final class MainActivity extends Activity {
                             updated.lastMatched = editing.lastMatched;
                             updated.lastFingerprint = editing.lastFingerprint;
                             updated.lastPreview = editing.lastPreview;
+                            updated.previousValueKnown=editing.previousValueKnown;updated.previousValueChanged=editing.previousValueChanged;
                             updated.lastError = editing.lastError;
                             updated.lastChecked = editing.lastChecked;
                             updated.lastAlert = editing.lastAlert;

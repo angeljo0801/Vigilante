@@ -35,6 +35,8 @@ public final class Watch {
     public boolean lastMatched = false;
     public String lastFingerprint = "";
     public String lastPreview = "";
+    public boolean previousValueKnown = false;
+    public boolean previousValueChanged = false;
     public String lastError = "";
     public long lastChecked = 0;
     public long lastAlert = 0;
@@ -69,6 +71,8 @@ public final class Watch {
         j.put("lastMatched", lastMatched);
         j.put("lastFingerprint", lastFingerprint);
         j.put("lastPreview", lastPreview);
+        j.put("previousValueKnown", previousValueKnown);
+        j.put("previousValueChanged", previousValueChanged);
         j.put("lastError", lastError);
         j.put("lastChecked", lastChecked);
         j.put("lastAlert", lastAlert);
@@ -106,6 +110,8 @@ public final class Watch {
         w.lastMatched = j.optBoolean("lastMatched", false);
         w.lastFingerprint = j.optString("lastFingerprint", "");
         w.lastPreview = j.optString("lastPreview", "");
+        w.previousValueKnown = j.optBoolean("previousValueKnown", false);
+        w.previousValueChanged = j.optBoolean("previousValueChanged", false);
         w.lastError = j.optString("lastError", "");
         w.lastChecked = j.optLong("lastChecked", 0L);
         w.lastAlert = j.optLong("lastAlert", 0L);
@@ -130,6 +136,7 @@ public final class Watch {
         lastMatched = false;
         lastFingerprint = "";
         lastPreview = "";
+        previousValueKnown=false;previousValueChanged=false;
         lastError = "";
         lastChecked = 0;
         lastAlert = 0;

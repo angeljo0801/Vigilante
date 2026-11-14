@@ -30,6 +30,8 @@ public final class MonitorRunner {
                 current.lastChecked = now;
                 current.lastError = "";
                 current.actionRequired = false;
+                current.previousValueKnown=current.initialized;
+                current.previousValueChanged=current.initialized&&!current.lastFingerprint.equals(observation.fingerprint);
                 current.lastPreview = observation.preview();
                 NumericTrend.record(current,observation.observed,now);
                 current.lastMatched = observation.matched;
