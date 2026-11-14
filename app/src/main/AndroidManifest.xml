@@ -25,27 +25,27 @@
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
             android:exported="true">
             <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE"/></intent-filter>
-            <meta-data android:name="android.service.quicksettings.ACTIVE_TILE" android:value="true"/>
+
         </service>
         <service android:name=".ValueTileService2" android:label="Vigilante · Alerta 2" android:icon="@drawable/ic_qs_value" android:permission="android.permission.BIND_QUICK_SETTINGS_TILE" android:exported="true">
             <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE"/></intent-filter>
-            <meta-data android:name="android.service.quicksettings.ACTIVE_TILE" android:value="true"/>
+
         </service>
         <service android:name=".ValueTileService3" android:label="Vigilante · Alerta 3" android:icon="@drawable/ic_qs_value" android:permission="android.permission.BIND_QUICK_SETTINGS_TILE" android:exported="true">
             <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE"/></intent-filter>
-            <meta-data android:name="android.service.quicksettings.ACTIVE_TILE" android:value="true"/>
+
         </service>
         <service android:name=".ValueTileService4" android:label="Vigilante · Alerta 4" android:icon="@drawable/ic_qs_value" android:permission="android.permission.BIND_QUICK_SETTINGS_TILE" android:exported="true">
             <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE"/></intent-filter>
-            <meta-data android:name="android.service.quicksettings.ACTIVE_TILE" android:value="true"/>
+
         </service>
         <service android:name=".ValueTileService5" android:label="Vigilante · Alerta 5" android:icon="@drawable/ic_qs_value" android:permission="android.permission.BIND_QUICK_SETTINGS_TILE" android:exported="true">
             <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE"/></intent-filter>
-            <meta-data android:name="android.service.quicksettings.ACTIVE_TILE" android:value="true"/>
+
         </service>
         <service android:name=".ValueTileService6" android:label="Vigilante · Alerta 6" android:icon="@drawable/ic_qs_value" android:permission="android.permission.BIND_QUICK_SETTINGS_TILE" android:exported="true">
             <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE"/></intent-filter>
-            <meta-data android:name="android.service.quicksettings.ACTIVE_TILE" android:value="true"/>
+
         </service>
         <activity android:name=".ManualPageActivity" android:exported="false"/>
         <activity

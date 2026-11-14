@@ -6,7 +6,8 @@ import android.service.quicksettings.TileService;
 import java.util.List;
 
 public final class QuickValue {
-    private static final String PREF="vigilante_quick_tile";
+    static final String PREF="vigilante_quick_tile";
+    static final String ACTION_REFRESH="com.vigilante.app.QUICK_VALUE_REFRESH";
     public static final int SLOTS=6;
     private QuickValue(){}
     private static String key(int slot){return slot==0?"watch_id":"watch_id_"+slot;}
@@ -45,14 +46,25 @@ public final class QuickValue {
         }
     }
     static void request(Context c){
-        for(int i=0;i<SLOTS;i++)try{TileService.requestListeningState(c,new ComponentName(c,service(i)));}
-        catch(RuntimeException ignored){}
+        // Passive tiles refresh every time SystemUI opens. Notify currently listening tiles too.
+        c.sendBroadcast(new android.content.Intent(ACTION_REFRESH).setPackage(c.getPackageName()));
     }
-    static boolean hasReading(Watch w){return w!=null&&w.initialized;}
+    static boolean hasReading(Watch w){return w!=null&&(w.initialized||w.lastNumericAt>0||lastValid(w)!=null);}
+    private static org.json.JSONObject lastValid(Watch w){
+        if(w==null)return null;
+        for(int i=0;i<w.history.length();i++){
+            org.json.JSONObject row=w.history.optJSONObject(i);
+            if(row!=null&&row.has("value")&&row.optString("error").isEmpty())return row;
+        }
+        return null;
+    }
     static String value(Watch w){
-        if(w==null||!hasReading(w))return "Sin lectura";
+        if(!hasReading(w))return "Sin lectura";
         if(!w.lastNumeric.isEmpty())return w.lastNumeric;
-        return w.lastPreview.isEmpty()?"(Vacío)":w.lastPreview;
+        if(!w.lastPreview.isEmpty())return w.lastPreview;
+        org.json.JSONObject row=lastValid(w);
+        String stored=row==null?"":row.optString("value");
+        return stored.isEmpty()?"(Vacío)":stored;
     }
     static String compact(String value,int max){
         String s=value.replaceAll("\\s+"," ").trim();
@@ -82,8 +94,9 @@ public final class QuickValue {
         return w.previousValueChanged?"Cambió":"Sin cambios";
     }
     static String iconText(Watch w){
-        if(!hasReading(w))return "";
+        if(!hasReading(w))return w==null?"?":"—";
         NumericTrend n=NumericTrend.storedValue(w.lastNumeric);
+        if(n==null)n=NumericTrend.parse(value(w),NumericTrend.unitHint(w));
         return n==null?compact(value(w),12):compact(NumericTrend.fmt(n.value),12);
     }
 }

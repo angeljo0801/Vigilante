@@ -19,6 +19,13 @@ public class QuickValueTest {
    assertEquals("Entregado ↻",QuickValue.label(status));assertEquals("Cambió",QuickValue.subtitle(status));
    assertEquals("Entregado",QuickValue.iconText(status));
  }
+ @Test public void oldSavedPreviewProvidesNumberWithoutNewExtraction(){
+   Watch w=new Watch();w.name="USD/CUP";w.initialized=true;w.lastPreview="913";
+   assertEquals("913",QuickValue.iconText(w));
+   assertEquals("913",QuickValue.label(w));
+   assertEquals("—",QuickValue.iconText(new Watch()));
+   assertEquals("?",QuickValue.iconText(null));
+ }
  @Test public void longTextIsAbbreviatedAndNoReadingDoesNotInventValue(){
    Watch w=new Watch();w.lastPreview="Entrega prevista para el próximo lunes";
    assertEquals("Sin lectura",QuickValue.label(w));w.initialized=true;

@@ -78,7 +78,7 @@ public final class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (cardList != null) { Scheduler.syncAll(this); refreshCards(); ChatInbox.requestNow(this); }
+        if (cardList != null) { Scheduler.syncAll(this); refreshCards(); ChatInbox.requestNow(this); QuickValue.request(this); }
     }
 
     @Override
@@ -190,7 +190,7 @@ public final class MainActivity extends Activity {
         bridge.setOnClickListener(v -> showBridgeSettings());
         root.addView(bridge,bottomMargin(dp(44),10));
         Button refresh = button("Actualizar resultados", CARD);
-        refresh.setOnClickListener(v -> refreshCards());
+        refresh.setOnClickListener(v -> {refreshCards();QuickValue.request(this);});
         root.addView(refresh, bottomMargin(dp(43), 10));
         if (Build.VERSION.SDK_INT >= 31) {
             Button exact = button("Permitir alarmas a la hora elegida", CARD);
