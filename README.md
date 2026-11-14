@@ -53,3 +53,5 @@ No se incluyen cuentas, contraseñas ni claves en el repositorio.
 
 ## Firma permanente de actualizaciones (2.0.1+)
 Configura cuatro secretos de Actions: ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS y ANDROID_KEY_PASSWORD. Usa siempre el mismo almacén y alias. Conserva una copia privada fuera del repositorio. El flujo falla explícitamente si faltan secretos, nunca publica una APK firmada con una clave temporal. Para generar una nueva clave o reutilizar una existente, ejecuta tools/setup-signing.ps1 en Windows con Java y GitHub CLI instalados. La clave anterior es imprescindible si deseas actualizar una APK ya instalada con esa firma; una nueva clave no puede reemplazarla. El ID de aplicación se mantiene com.vigilante.app.
+
+La APK firmada se publica como artefacto Vigilante-APK tras verificar su certificado.
