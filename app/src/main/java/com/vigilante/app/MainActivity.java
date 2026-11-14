@@ -178,6 +178,9 @@ public final class MainActivity extends Activity {
         Button direct = button("Conectar ChatGPT · envío directo",BLUE);
         direct.setOnClickListener(v->showChatInbox());
         root.addView(direct,bottomMargin(dp(48),12));
+        Button quick=button("Añadir precio al panel de control",BLUE);
+        quick.setOnClickListener(v->showQuickValue());
+        root.addView(quick,bottomMargin(dp(48),12));
         Button bridge = button("Configurar Playwright remoto", CARD);
         bridge.setOnClickListener(v -> showBridgeSettings());
         root.addView(bridge,bottomMargin(dp(44),10));
@@ -447,6 +450,45 @@ public final class MainActivity extends Activity {
                 background.execute(()->{String msg;try{RemoteBrowser.test(getApplicationContext());msg="Conexión correcta.";}catch(Exception e){msg="Error: "+e.getMessage();}final String result=msg;runOnUiThread(()->{if(dialog.isShowing())info.setText(result);});});
             });
         });dialog.show();
+    }
+
+    private void showQuickValue(){
+        java.util.ArrayList<Watch> choices=new java.util.ArrayList<>();
+        for(Watch w:WatchStore.all(this))if(!w.inboxDraft)choices.add(w);
+        if(choices.isEmpty()){new AlertDialog.Builder(this).setMessage("Crea primero una vigilancia numérica.").setPositiveButton("Cerrar",null).show();return;}
+        String[] labels=new String[choices.size()+1];labels[0]="Automático · USD/CUP preferido";
+        String current=QuickValue.selectedId(this);int initial=0;
+        for(int i=0;i<choices.size();i++){
+            Watch w=choices.get(i);labels[i+1]=w.name+(w.lastNumeric.isEmpty()?" · Sin lectura":" · "+w.lastNumeric);
+            if(w.id.equals(current))initial=i+1;
+        }
+        final int[] selected={initial};
+        new AlertDialog.Builder(this).setTitle("Precio en ajustes rápidos")
+            .setSingleChoiceItems(labels,initial,(d,i)->selected[0]=i)
+            .setNegativeButton("Cancelar",null)
+            .setNeutralButton("Guardar selección",(d,v)->QuickValue.select(this,selected[0]==0?"":choices.get(selected[0]-1).id))
+            .setPositiveButton("Añadir al panel",(d,v)->{
+                QuickValue.select(this,selected[0]==0?"":choices.get(selected[0]-1).id);
+                if(Build.VERSION.SDK_INT>=33){
+                    try{
+                        android.app.StatusBarManager manager=getSystemService(android.app.StatusBarManager.class);
+                        manager.requestAddTileService(new android.content.ComponentName(this,ValueTileService.class),
+                            "Vigilante · Precio",android.graphics.drawable.Icon.createWithResource(this,R.drawable.ic_qs_value),
+                            getMainExecutor(),result->{
+                                if(result==android.app.StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED||result==android.app.StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED){
+                                    QuickValue.request(this);
+                                    android.widget.Toast.makeText(this,"Acceso añadido. Ordénalo con el lápiz del panel.",android.widget.Toast.LENGTH_LONG).show();
+                                }else showQuickInstructions();
+                            });
+                    }catch(RuntimeException ex){showQuickInstructions();}
+                }else showQuickInstructions();
+            }).show();
+    }
+
+    private void showQuickInstructions(){
+        new AlertDialog.Builder(this).setTitle("Añadir Vigilante al panel")
+            .setMessage("Desliza para abrir los ajustes rápidos, pulsa el lápiz de edición y busca Vigilante · Precio entre los accesos disponibles. Arrástralo a la posición deseada. Android decide el tamaño y si muestra las etiquetas.")
+            .setPositiveButton("Entendido",null).show();
     }
 
     private void showChatInbox(){

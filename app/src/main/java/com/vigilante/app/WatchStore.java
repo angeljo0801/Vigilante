@@ -43,6 +43,7 @@ public final class WatchStore {
         if (!pref.edit().putString(KEY, array.toString()).commit()) {
             throw new IllegalStateException("No se pudieron guardar los datos");
         }
+        QuickValue.request(ctx);
     }
 
     public static List<Watch> all(Context ctx) {

@@ -19,6 +19,14 @@
                 <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED"/>
             </intent-filter>
         </receiver>
+        <service android:name=".ValueTileService"
+            android:label="Vigilante · Precio"
+            android:icon="@drawable/ic_qs_value"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:exported="true">
+            <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE"/></intent-filter>
+            <meta-data android:name="android.service.quicksettings.ACTIVE_TILE" android:value="true"/>
+        </service>
         <activity android:name=".ManualPageActivity" android:exported="false"/>
         <activity
             android:name=".MainActivity"
