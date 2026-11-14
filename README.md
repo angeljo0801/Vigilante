@@ -64,3 +64,6 @@ Explorador: modo Navegador (predeterminado) y HTML directo. El navegador Android
 
 ## 2.3 — Intervención humana
 Cuando se detecta una posible verificación humana (CAPTCHA) o restricciones HTTP 401/403/429, la vigilancia registra el problema, envía una notificación y no realiza nuevas consultas automáticas hasta que una comprobación manual tenga éxito. La notificación y el dashboard abren una vista de navegación manual sin extracción, sin resolver CAPTCHA automáticamente ni ignorar restricciones. El usuario puede volver y reintentar cuando el sitio permita el acceso. El detector es heurístico y puede no identificar todas las verificaciones; algunos sitios no admiten WebView ni automatización. Las restricciones se mantienen si el sitio sigue bloqueando. El explorador también muestra la acción requerida.
+
+## 3.0 — Motor híbrido
+Automático combina HTML y WebView para descubrir datos; Playwright se usa explícitamente o cuando ninguno devuelve campos. Cada elemento conserva su motor de origen; las vigilancias automáticas solo escalan cuando falta el dato, nunca ante restricciones de acceso o errores de red. Playwright requiere configurar un puente privado HTTPS en el PC (carpeta bridge). Sigue funcionando sin puente. No se crean servicios de pago. Consulta bridge/README.md. Ningún motor garantiza acceso a todos los sitios.

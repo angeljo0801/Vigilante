@@ -32,14 +32,14 @@ public final class WebScanner {
     }
 
     public static Observation scan(Context context, Watch watch) throws IOException {
+        return Engines.scan(context,watch);
+    }
+
+    static Observation scanHtml(Watch watch) throws IOException {
         try {
             String url = watch.url.trim();
             if (!(url.startsWith("http://") || url.startsWith("https://"))) {
                 throw new IOException("La dirección debe empezar por https:// o http://");
-            }
-            if (watch.dynamic) {
-                Document rendered = RenderedPage.load(context, url, watch.renderWaitSeconds);
-                return observe(watch, extract(rendered, watch));
             }
             Connection.Response response = Jsoup.connect(url)
                     .userAgent("Mozilla/5.0 (compatible; Vigilante/1.0; Android)")
@@ -75,7 +75,7 @@ public final class WebScanner {
         } else {
             Elements selected = document.select(watch.selector.trim());
             if (selected.isEmpty()) {
-                throw new IOException("No se encontró el selector CSS: " + watch.selector);
+                throw new Engines.MissingData("No se encontró el selector CSS: " + watch.selector);
             }
             StringBuilder buf = new StringBuilder();
             for (Element element : selected) {
@@ -94,17 +94,18 @@ public final class WebScanner {
             text = text.replaceAll("\\s+", " ").trim();
             if (!watch.regex.isEmpty()) {
                 Matcher m = Pattern.compile(watch.regex, Pattern.CASE_INSENSITIVE).matcher(text);
-                if (!m.find()) throw new IOException("No se encontró el patrón de extracción");
+                if (!m.find()) throw new Engines.MissingData("No se encontró el patrón de extracción");
                 text = m.groupCount() > 0 ? m.group(1) : m.group();
-                if (text == null || text.isEmpty()) throw new IOException("Extracción vacía");
+                if (text == null || text.isEmpty()) throw new Engines.MissingData("Extracción vacía");
             }
+            if(text.isEmpty() && !watch.selector.isEmpty()) throw new Engines.MissingData("Elemento sin contenido");
             String search = watch.keyword.trim().toLowerCase(Locale.ROOT);
             boolean matches = !search.isEmpty() && text.toLowerCase(Locale.ROOT).contains(search);
             if ("ABOVE".equals(watch.rule) || "BELOW".equals(watch.rule)) {
                 try {
                     double value = number(text), limit = number(watch.keyword);
                     matches = "ABOVE".equals(watch.rule) ? value > limit : value < limit;
-                } catch (NumberFormatException e) { throw new IOException("Extrae un solo número sin separadores de miles (decimal con punto o coma)."); }
+                } catch (NumberFormatException e) { throw new Engines.MissingData("Extrae un solo número sin separadores de miles (decimal con punto o coma)."); }
             }
             return new Observation(text, sha256(text), matches);
         } catch (IllegalArgumentException badSelector) {

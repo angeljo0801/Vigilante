@@ -10,3 +10,6 @@
 *.keystore
 *.p12
 *.keystore.b64
+
+bridge/node_modules/
+bridge/.env

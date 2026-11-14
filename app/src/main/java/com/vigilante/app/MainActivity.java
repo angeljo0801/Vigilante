@@ -161,6 +161,9 @@ public final class MainActivity extends Activity {
         add.setTextSize(16);
         add.setOnClickListener(v -> showEditor(null));
         root.addView(add, bottomMargin(dp(53), 12));
+        Button bridge = button("Configurar Playwright remoto", CARD);
+        bridge.setOnClickListener(v -> showBridgeSettings());
+        root.addView(bridge,bottomMargin(dp(44),10));
         Button refresh = button("Actualizar resultados", CARD);
         refresh.setOnClickListener(v -> refreshCards());
         root.addView(refresh, bottomMargin(dp(43), 10));
@@ -250,7 +253,7 @@ public final class MainActivity extends Activity {
         TextView target = text("◎  " + trigger, 14, WHITE, true);
         card.addView(target, bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT, 4));
 
-        String scope = (w.dynamic ? "JavaScript · " : "HTML · ") + (w.selector.isEmpty() ? "Página completa" : "Selector: " + w.selector);
+        String scope = (Engines.label(Engines.mode(w))+" · ") + (w.selector.isEmpty() ? "Página completa" : "Selector: " + w.selector);
         if (!w.attribute.isEmpty()) scope += " · atributo: " + w.attribute;
         scope += w.times.isEmpty() ? " · cada " + w.intervalMinutes + " min" : " · diario " + w.times;
         TextView scopeView = text(scope, 12, MUTED, false);
@@ -395,6 +398,29 @@ public final class MainActivity extends Activity {
         startActivity(i);
     }
 
+    private void showBridgeSettings(){
+        LinearLayout form=column();form.setPadding(dp(20),dp(16),dp(20),dp(10));
+        EditText endpoint=input(form,"Dirección HTTPS",RemoteBrowser.endpoint(this),"https://tu-pc...ts.net");
+        EditText token=input(form,"Token privado",RemoteBrowser.token(this),"Token generado en tu PC");
+        token.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        TextView info=text("Opcional. Configura el puente desde tu PC. Deja ambos campos vacíos para desactivarlo.",13,MUTED,false);
+        form.addView(info);
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Playwright remoto").setView(form).setNegativeButton("Cancelar",null).setPositiveButton("Guardar",null).setNeutralButton("Probar conexión",null).create();
+        Runnable save=()->{
+            try{RemoteBrowser.configure(this,endpoint.getText().toString(),token.getText().toString());info.setText("Configuración guardada.");}
+            catch(Exception e){info.setText(e.getMessage());}
+        };
+        dialog.setOnShowListener(v->{
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(x->{save.run();if(info.getText().toString().equals("Configuración guardada."))dialog.dismiss();});
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(x->{
+                save.run();if(!info.getText().toString().equals("Configuración guardada."))return;
+                if(!RemoteBrowser.configured(this)){info.setText("Configura primero el puente.");return;}
+                info.setText("Probando conexión...");
+                background.execute(()->{String msg;try{RemoteBrowser.test(getApplicationContext());msg="Conexión correcta.";}catch(Exception e){msg="Error: "+e.getMessage();}final String result=msg;runOnUiThread(()->{if(dialog.isShowing())info.setText(result);});});
+            });
+        });dialog.show();
+    }
+
     private void showExplorer(String initialUrl) {
         ScrollView scroll = new ScrollView(this);
         LinearLayout form = column();
@@ -402,7 +428,7 @@ public final class MainActivity extends Activity {
         scroll.addView(form);
         EditText url = input(form,"URL de la página",initialUrl,"https://ejemplo.com");
         url.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
-        Spinner engine = spinner(form,"Motor de análisis",new String[]{"Navegador con JavaScript (recomendado)","HTML directo (rápido)"},0);
+        Spinner engine = spinner(form,"Motor de análisis",Engines.LABELS,0);
         Spinner wait = spinner(form,"Espera después de cargar JavaScript",new String[]{"3 segundos","8 segundos","15 segundos","25 segundos"},1);
         final int[] waits={3,8,15,25};
         Button analyze = button("Analizar página",BLUE);
@@ -418,15 +444,16 @@ public final class MainActivity extends Activity {
         form.addView(results);
         AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Explorador web")
             .setView(scroll).setNegativeButton("Cerrar",null).create();
-        final java.util.List<PageExplorer.Candidate> found = new java.util.ArrayList<>();
+        final java.util.List<Engines.Found> found = new java.util.ArrayList<>();
         final String[] analyzedUrl = {""};
-        final boolean[] analyzedDynamic = {true};
+        final String[] analyzedMode = {"AUTO"};
         final int[] analyzedWait = {8};
         Runnable render = () -> {
             results.removeAllViews();
             String query=filter.getText().toString().trim().toLowerCase(Locale.ROOT);
             int visible=0;
-            for(PageExplorer.Candidate c: found) {
+            for(Engines.Found itemFound: found) {
+                PageExplorer.Candidate c=itemFound.candidate;
                 if(!query.isEmpty() && !(c.category+" "+c.label+" "+c.value).toLowerCase(Locale.ROOT).contains(query)) continue;
                 visible++;
                 LinearLayout item=column();
@@ -434,6 +461,7 @@ public final class MainActivity extends Activity {
                 item.setBackground(rounded(CARD,12,BORDER));
                 item.addView(text(c.category+" · "+c.label,14,GREEN,true));
                 item.addView(text(c.value,15,WHITE,false),bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT,8));
+                item.addView(text("Motor: "+Engines.label(itemFound.engine),12,MUTED,false));
                 Button select=button("Vigilar este dato",BLUE);
                 select.setOnClickListener(v -> {
                     Watch draft=new Watch();
@@ -443,7 +471,9 @@ public final class MainActivity extends Activity {
                     draft.attribute=c.attribute;
                     draft.regex=c.regex;
                     draft.rule="CHANGES";
-                    draft.dynamic=analyzedDynamic[0];
+                    draft.engine=analyzedMode[0];
+                    draft.preferredEngine=itemFound.engine;
+                    draft.dynamic=!"HTML".equals(itemFound.engine);
                     draft.renderWaitSeconds=analyzedWait[0];
                     showEditor(null,draft);
                 });
@@ -466,18 +496,18 @@ public final class MainActivity extends Activity {
                 url.setError("Introduce una URL HTTP o HTTPS válida"); return;
             }
             url.setText(target);
-            final boolean dynamic = engine.getSelectedItemPosition()==0;
+            final String mode = Engines.MODES[engine.getSelectedItemPosition()];
             final int seconds=waits[wait.getSelectedItemPosition()];
             analyze.setEnabled(false); url.setEnabled(false); engine.setEnabled(false); wait.setEnabled(false);
             found.clear(); results.removeAllViews(); filter.setVisibility(View.GONE); verify.setVisibility(View.GONE);
-            status.setText(dynamic?"Cargando página y ejecutando JavaScript...":"Analizando HTML...");
+            status.setText("Analizando con "+Engines.label(mode)+"...");
             background.execute(() -> {
                 try {
-                    java.util.List<PageExplorer.Candidate> candidates=dynamic ? PageExplorer.discover(RenderedPage.load(getApplicationContext(),target,seconds)) : PageExplorer.inspect(target);
+                    java.util.List<Engines.Found> candidates=Engines.explore(getApplicationContext(),target,seconds,mode);
                     runOnUiThread(() -> {
                         if(!dialog.isShowing()||isDestroyed()) return;
                         analyze.setEnabled(true); url.setEnabled(true); engine.setEnabled(true); wait.setEnabled(true);
-                        found.addAll(candidates); analyzedUrl[0]=target; analyzedDynamic[0]=dynamic; analyzedWait[0]=seconds;
+                        found.addAll(candidates); analyzedUrl[0]=target; analyzedMode[0]=mode; analyzedWait[0]=seconds;
                         status.setText(found.isEmpty()?"No se encontraron datos compatibles. Prueba otra espera o motor.":found.size()+" datos detectados. Elige uno para configurar su vigilancia.");
                         if(!found.isEmpty()) { filter.setVisibility(View.VISIBLE); filter.setText(""); render.run(); }
                     });
@@ -525,7 +555,7 @@ public final class MainActivity extends Activity {
                 12, MUTED, false);
         form.addView(tip, bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT, 17));
 
-        Spinner engine = spinner(form,"Motor de extracción",new String[]{"HTML directo","Navegador con JavaScript"},seed != null && seed.dynamic ? 1 : 0);
+        Spinner engine = spinner(form,"Motor de extracción",Engines.LABELS,seed == null ? 0 : Engines.index(Engines.mode(seed)));
         final int[] waitOptions={3,8,15,25};
         int waitIndex=1;
         if(seed!=null) for(int i=0;i<waitOptions.length;i++) if(waitOptions[i]==seed.renderWaitSeconds) waitIndex=i;
@@ -584,7 +614,10 @@ public final class MainActivity extends Activity {
                     Watch updated = new Watch();
                     updated.times=schedule;
                     updated.regex=pattern;
-                    updated.dynamic=engine.getSelectedItemPosition()==1;
+                    updated.engine=Engines.MODES[engine.getSelectedItemPosition()];
+                    updated.preferredEngine=seed==null?"":seed.preferredEngine;
+                    if("PLAYWRIGHT".equals(updated.engine)&&!RemoteBrowser.configured(this)){new AlertDialog.Builder(this).setMessage("Configura el puente Playwright en el dashboard.").setPositiveButton("Cerrar",null).show();return;}
+                    updated.dynamic=!"HTML".equals(updated.engine);
                     updated.renderWaitSeconds=waitOptions[renderWait.getSelectedItemPosition()];
                     if (editing != null) updated.id = editing.id;
                     updated.name = name.getText().toString().trim();
