@@ -57,6 +57,17 @@ public final class MainActivity extends Activity {
         Scheduler.syncAll(this);
         createDashboard();
         askNotificationPermission();
+        if(state==null) receiveImport(getIntent());
+    }
+
+    @Override protected void onNewIntent(android.content.Intent intent){
+        super.onNewIntent(intent);setIntent(intent);receiveImport(intent);
+    }
+
+    private void receiveImport(android.content.Intent intent){
+        if(intent==null||!android.content.Intent.ACTION_SEND.equals(intent.getAction()))return;
+        CharSequence content=intent.getCharSequenceExtra(android.content.Intent.EXTRA_TEXT);
+        if(content!=null)showImport(content.toString());
     }
 
     @Override
@@ -161,6 +172,9 @@ public final class MainActivity extends Activity {
         add.setTextSize(16);
         add.setOnClickListener(v -> showEditor(null));
         root.addView(add, bottomMargin(dp(53), 12));
+        Button importTask=button("Importar búsqueda de ChatGPT",BLUE);
+        importTask.setOnClickListener(v->showImport(""));
+        root.addView(importTask,bottomMargin(dp(48),12));
         Button bridge = button("Configurar Playwright remoto", CARD);
         bridge.setOnClickListener(v -> showBridgeSettings());
         root.addView(bridge,bottomMargin(dp(44),10));
@@ -247,6 +261,7 @@ public final class MainActivity extends Activity {
         TextView url = text(w.url, 12, MUTED, false);
         url.setMaxLines(2);
         card.addView(url, bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT, 11));
+        if(!w.objective.isEmpty()) { TextView goal=text("Objetivo: "+w.objective,12,MUTED,false);goal.setMaxLines(3);card.addView(goal,bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT,8)); }
 
         int rulePos = Math.max(0, Arrays.asList(RULES).indexOf(w.rule));
         String trigger = RULE_LABELS[rulePos] + (w.keyword.isEmpty() ? "" : ": " + w.keyword);
@@ -421,16 +436,45 @@ public final class MainActivity extends Activity {
         });dialog.show();
     }
 
-    private void showExplorer(String initialUrl) {
+    private void showImport(String initial){
+        ScrollView scroll=new ScrollView(this);
+        LinearLayout form=column();form.setPadding(dp(20),dp(16),dp(20),dp(12));scroll.addView(form);
+        form.addView(text("Comparte una configuración desde ChatGPT o pégala aquí. Se abrirá un borrador: no se programa nada hasta confirmar Guardar. El objetivo es una nota, no una instrucción ejecutada por IA.",14,MUTED,false),bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT,12));
+        EditText paste=new EditText(this);paste.setText(initial.length()>20000?initial.substring(0,20000):initial);paste.setHint("VIGILANTE/1 o enlace compartido");
+        paste.setTextColor(WHITE);paste.setHintTextColor(MUTED);paste.setGravity(Gravity.TOP);paste.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE);paste.setMinLines(5);paste.setMaxLines(10);
+        paste.setBackground(rounded(CARD,10,BORDER));paste.setPadding(dp(12),dp(10),dp(12),dp(10));form.addView(paste,bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT,12));
+        Button template=button("Copiar plantilla para ChatGPT",CARD);
+        template.setOnClickListener(v->{android.content.ClipboardManager cb=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);cb.setPrimaryClip(android.content.ClipData.newPlainText("Plantilla Vigilante",TaskImport.TEMPLATE));android.widget.Toast.makeText(this,"Plantilla copiada",android.widget.Toast.LENGTH_SHORT).show();});
+        form.addView(template,bottomMargin(dp(44),10));
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Importar búsqueda").setView(scroll).setNegativeButton("Cancelar",null).setPositiveButton("Revisar",null).create();
+        dialog.setOnShowListener(v->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(x->{
+            try{Watch draft=TaskImport.parse(paste.getText().toString());dialog.dismiss();showImportReview(draft);}
+            catch(Exception e){paste.setError(e.getMessage());}
+        }));dialog.show();
+    }
+
+    private void showImportReview(Watch draft){
+        String when=draft.times.isEmpty()?"Cada "+draft.intervalMinutes+" minutos":draft.times+" (diario, hora del teléfono)";
+        String info=draft.name+"\n"+(draft.url.isEmpty()?"Falta indicar la URL":draft.url)+"\n\nObjetivo: "+draft.objective+"\nHorario: "+when+"\nRegla: "+draft.rule+"\nMotor: "+Engines.label(Engines.mode(draft))+"\n\nRevisa los datos antes de guardar. Si falta el selector, elige un elemento en el explorador. Las tareas de ChatGPT no se sincronizan automáticamente.";
+        new AlertDialog.Builder(this).setTitle("Revisar búsqueda importada").setMessage(info)
+            .setNegativeButton("Cancelar",null)
+            .setNeutralButton("Elegir elemento",(d,v)->showExplorer(draft.url,draft))
+            .setPositiveButton("Editar y guardar",(d,v)->showEditor(null,draft)).show();
+    }
+
+    private void showExplorer(String initialUrl) {showExplorer(initialUrl,null);}
+
+    private void showExplorer(String initialUrl, Watch imported) {
         ScrollView scroll = new ScrollView(this);
         LinearLayout form = column();
         form.setPadding(dp(20),dp(16),dp(20),dp(12));
         scroll.addView(form);
         EditText url = input(form,"URL de la página",initialUrl,"https://ejemplo.com");
         url.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
-        Spinner engine = spinner(form,"Motor de análisis",Engines.LABELS,0);
+        Spinner engine = spinner(form,"Motor de análisis",Engines.LABELS,imported==null?0:Engines.index(Engines.mode(imported)));
         Spinner wait = spinner(form,"Espera después de cargar JavaScript",new String[]{"3 segundos","8 segundos","15 segundos","25 segundos"},1);
         final int[] waits={3,8,15,25};
+        if(imported!=null) for(int i=0;i<waits.length;i++)if(waits[i]==imported.renderWaitSeconds)wait.setSelection(i);
         Button analyze = button("Analizar página",BLUE);
         form.addView(analyze,bottomMargin(dp(48),12));
         TextView status = text("Detectaremos datos que se puedan vigilar sin escribir código.",14,MUTED,false);
@@ -465,12 +509,13 @@ public final class MainActivity extends Activity {
                 Button select=button("Vigilar este dato",BLUE);
                 select.setOnClickListener(v -> {
                     Watch draft=new Watch();
-                    draft.name=c.label;
+                    draft.name=imported==null?c.label:imported.name+" · "+c.label;
+                    if(imported!=null){draft.objective=imported.objective;draft.times=imported.times;draft.intervalMinutes=imported.intervalMinutes;draft.keyword=imported.keyword;}
                     draft.url=analyzedUrl[0];
                     draft.selector=c.selector;
                     draft.attribute=c.attribute;
                     draft.regex=c.regex;
-                    draft.rule="CHANGES";
+                    draft.rule=imported==null?"CHANGES":imported.rule;
                     draft.engine=analyzedMode[0];
                     draft.preferredEngine=itemFound.engine;
                     draft.dynamic=!"HTML".equals(itemFound.engine);
@@ -542,6 +587,7 @@ public final class MainActivity extends Activity {
         EditText url = input(form, "Dirección web (URL)",
                 seed == null ? "" : seed.url, "https://sitio.com/producto");
         url.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        EditText objective = input(form,"Objetivo / nota (opcional)",seed==null?"":seed.objective,"Qué información deseas vigilar");
         EditText keyword = input(form, "Palabra, estado o umbral numérico",
                 seed == null ? "" : seed.keyword, "Disponible, Entregado, En stock...");
         EditText css = input(form, "Selector CSS (opcional)",
@@ -564,7 +610,7 @@ public final class MainActivity extends Activity {
         Spinner rule = spinner(form, "Avísame cuando...", RULE_LABELS, ruleIndex);
 
         String[] intervalLabels = {"15 minutos", "30 minutos", "1 hora", "2 horas", "6 horas", "12 horas", "24 horas"};
-        int intervalIndex = editing == null ? 0 : Arrays.asList(INTERVALS).indexOf(editing.intervalMinutes);
+        int intervalIndex = seed == null ? 0 : Arrays.asList(INTERVALS).indexOf(seed.intervalMinutes);
         Spinner interval = spinner(form, "Intervalo de comprobación", intervalLabels, intervalIndex);
 
         EditText times = input(form, "Horas diarias (opcional; reemplazan intervalo)",
@@ -621,6 +667,7 @@ public final class MainActivity extends Activity {
                     updated.renderWaitSeconds=waitOptions[renderWait.getSelectedItemPosition()];
                     if (editing != null) updated.id = editing.id;
                     updated.name = name.getText().toString().trim();
+                    updated.objective=objective.getText().toString().trim();
                     if (updated.name.isEmpty()) updated.name = uri.getHost();
                     updated.url = web;
                     updated.keyword = phrase;

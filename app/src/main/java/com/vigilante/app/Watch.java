@@ -9,6 +9,7 @@ import java.util.UUID;
 public final class Watch {
     public String id = UUID.randomUUID().toString();
     public String name = "";
+    public String objective = "";
     public String url = "";
     public String keyword = "";
     public String selector = "";
@@ -36,6 +37,7 @@ public final class Watch {
         JSONObject j = new JSONObject();
         j.put("id", id);
         j.put("name", name);
+        j.put("objective", objective);
         j.put("url", url);
         j.put("keyword", keyword);
         j.put("selector", selector);
@@ -65,6 +67,7 @@ public final class Watch {
         Watch w = new Watch();
         w.id = j.optString("id", w.id);
         w.name = j.optString("name", "");
+        w.objective = j.optString("objective", "");
         w.url = j.optString("url", "");
         w.keyword = j.optString("keyword", "");
         w.selector = j.optString("selector", "");
