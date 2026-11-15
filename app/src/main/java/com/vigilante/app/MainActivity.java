@@ -1,4 +1,5 @@
 package com.vigilante.app;
+import android.widget.Toast;
 
 import android.Manifest;
 import android.app.Activity;
