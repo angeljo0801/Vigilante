@@ -15,7 +15,7 @@ public final class MonitorRunner {
         Watch before = WatchStore.find(context, id);
         if (before == null) return "Esta vigilancia ya no existe.";
         if (!before.enabled) return "Esta vigilancia está pausada.";
-        if (before.actionRequired && !manual && !CargoReference.matches(before)) return "Esperando intervención manual. No se harán nuevas consultas automáticas.";
+        if (before.actionRequired && !manual) return "Esperando intervención manual. No se harán nuevas consultas automáticas.";
 
         long now = System.currentTimeMillis();
         try {
@@ -33,12 +33,12 @@ public final class MonitorRunner {
                 current.previousValueKnown=current.initialized;
                 current.previousValueChanged=current.initialized&&!current.lastFingerprint.equals(observation.fingerprint);
                 current.lastPreview = observation.preview();
-                NumericTrend.record(current,observation.observed,observation.observedAt>0?observation.observedAt:now);
+                NumericTrend.record(current,observation.observed,now);
                 current.lastMatched = observation.matched;
                 current.lastFingerprint = observation.fingerprint;
                 current.initialized = true;
                 if (alert) current.lastAlert = now;
-                record(current, observation.observedAt>0?observation.observedAt:now, observation.observed, "", alert);
+                record(current, now, observation.observed, "", alert);
                 triggered.set(alert);
                 updated.set(true);
             });
