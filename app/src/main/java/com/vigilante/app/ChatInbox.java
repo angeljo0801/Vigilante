@@ -24,6 +24,8 @@ public final class ChatInbox {
     private static final String ROOT="https://raw.githubusercontent.com/angeljo0801/Vigilante/inbox/inbox/";
     private ChatInbox(){}
     static SharedPreferences prefs(Context c){return c.getSharedPreferences(PREF,Context.MODE_PRIVATE);}
+    public static boolean editsEnabled(Context c){return prefs(c).getBoolean("remote_edits",false);}
+    public static void allowEdits(Context c,boolean value){prefs(c).edit().putBoolean("remote_edits",value).apply();}
     public static boolean enabled(Context c){return prefs(c).getBoolean("enabled",false);}
     public static void enable(Context c,boolean value){
         prefs(c).edit().putBoolean("enabled",value).apply();
@@ -76,7 +78,7 @@ public final class ChatInbox {
         KeyStore ks=keyStore();String recipient=recipient(ks);
         HttpURLConnection con=(HttpURLConnection)new URL(ROOT+recipient+".json?ts="+System.currentTimeMillis()).openConnection();
         con.setConnectTimeout(12000);con.setReadTimeout(15000);con.setInstanceFollowRedirects(false);con.setRequestProperty("Cache-Control","no-cache");
-        int added=0,drafts=0,invalid=0;
+        int added=0,drafts=0,invalid=0,edited=0;
         try{
             int status=con.getResponseCode();
             if(status==404)return status(c,"Sin envíos nuevos.");
@@ -96,6 +98,11 @@ public final class ChatInbox {
                 if(prefs(c).getBoolean("seen:"+id,false))continue;
                 try{
                     String plain=decrypt(ks,row,id,recipient);
+                    if(plain.trim().startsWith("VIGILANTE-EDIT/1")){
+                        if(!editsEnabled(c))continue;
+                        RemoteEdit.apply(c,plain,id);
+                        prefs(c).edit().putBoolean("seen:"+id,true).commit();edited++;continue;
+                    }
                     Watch watch=TaskImport.parse(plain);watch.id="inbox-"+id;
                     if(WatchStore.find(c,watch.id)!=null){prefs(c).edit().putBoolean("seen:"+id,true).commit();continue;}
                     boolean ready=TaskImport.readyForAuto(watch,plain)&&(!"PLAYWRIGHT".equals(watch.engine)||RemoteBrowser.configured(c));
@@ -108,7 +115,7 @@ public final class ChatInbox {
                 }catch(Exception bad){invalid++;}
             }
         }finally{con.disconnect();}
-        return status(c,"Nuevas alarmas: "+added+" · Borradores: "+drafts+(invalid>0?" · Envíos no válidos: "+invalid:""));
+        return status(c,"Nuevas alarmas: "+added+" · Modificaciones: "+edited+" · Borradores: "+drafts+(invalid>0?" · Envíos no válidos: "+invalid:""));
     }
     static String status(Context c,String s){prefs(c).edit().putString("status",s).putLong("last",System.currentTimeMillis()).apply();return s;}
     public static String lastStatus(Context c){return prefs(c).getString("status","Sin sincronizar todavía.");}

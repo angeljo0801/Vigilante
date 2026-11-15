@@ -88,3 +88,12 @@ Los accesos pasan al modo no activo de TileService: SystemUI puede enlazarlos ca
 
 ## 3.5.2 — Corrección de pruebas de acceso rápido
 Una vigilancia sin lectura inicial no consulta su historial para decidir si contiene un valor. Se mantiene la recuperación de la vista previa de lecturas válidas y la protección contra mostrar datos viejos de una configuración reiniciada. Las pruebas de 3.5.1 se mantienen.
+
+
+### Edición desde ChatGPT (3.6)
+Activa recepción y autorización de cambios en Envío directo. El mismo buzón cifrado admite texto VIGILANTE-EDIT/1 seguido de JSON, por ejemplo:
+```
+VIGILANTE-EDIT/1
+{"op":"patch","name":"Mi alarma","patch":{"times":"10:00","engine":"AUTO"}}
+```
+Usa id exportado o nombre exacto único. op check solicita lectura; delete pausa de forma reversible. Los resultados se exportan manualmente desde la app; no se suben automáticamente. No requiere CargoConnect.

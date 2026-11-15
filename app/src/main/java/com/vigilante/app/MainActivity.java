@@ -533,6 +533,9 @@ public final class MainActivity extends Activity {
         form.addView(text("Vincula este teléfono una vez enviando su código público a ChatGPT. Los envíos viajan cifrados por GitHub y solo este teléfono los puede leer. Si activas la recepción, las configuraciones completas se guardan y programan automáticamente; las incompletas quedan como borradores.",14,MUTED,false),bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT,12));
         Switch enabled=new Switch(this);enabled.setText("Autorizar recepción automática");enabled.setTextColor(WHITE);enabled.setChecked(ChatInbox.enabled(this));
         enabled.setOnCheckedChangeListener((v,on)->ChatInbox.enable(this,on));form.addView(enabled,bottomMargin(dp(48),10));
+        Switch edits=new Switch(this);edits.setText("Autorizar cambios en alarmas existentes");edits.setTextColor(WHITE);edits.setChecked(ChatInbox.editsEnabled(this));edits.setOnCheckedChangeListener((v,on)->ChatInbox.allowEdits(this,on));form.addView(edits,bottomMargin(dp(48),10));
+        Button export=button("Copiar alarmas y resultados para ChatGPT",CARD);form.addView(export,bottomMargin(dp(48),10));
+        export.setOnClickListener(v->{android.content.ClipboardManager cb=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);cb.setPrimaryClip(android.content.ClipData.newPlainText("Vigilante",RemoteEdit.export(this)));});
         Button copy=button("Copiar código de vinculación",BLUE);form.addView(copy,bottomMargin(dp(48),10));
         TextView status=text(ChatInbox.lastStatus(this),13,MUTED,false);form.addView(status,bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT,10));
         Button sync=button("Sincronizar ahora",CARD);form.addView(sync,bottomMargin(dp(46),8));
