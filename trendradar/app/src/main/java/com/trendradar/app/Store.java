@@ -48,10 +48,10 @@ final class Store {
  static synchronized int sync(Context c)throws Exception{
   JSONObject f=read(c,"trendradar-feed.json");JSONArray items=f.getJSONArray("items");if(items.length()>500)throw new IOException("Feed demasiado grande");
   java.util.Set<String> seen=new java.util.HashSet<>(prefs(c).getStringSet("seen",new java.util.HashSet<>()));
-  boolean initial=!prefs(c).getBoolean("initialized",false);int count=0;
-  for(int i=0;i<items.length();i++){JSONObject v=items.getJSONObject(i);String id=v.getString("id");if(!seen.contains(id)&&!initial)count++;seen.add(id);}
+  boolean initial=!prefs(c).getBoolean("initialized",false);int count=0;java.util.List<JSONObject> fresh=new java.util.ArrayList<>();
+  for(int i=0;i<items.length();i++){JSONObject v=items.getJSONObject(i);String id=v.getString("id");if(!seen.contains(id)&&!initial){count++;fresh.add(v);}seen.add(id);}
   if(seen.size()>10000){seen.clear();for(int i=0;i<items.length();i++)seen.add(items.getJSONObject(i).getString("id"));}
   prefs(c).edit().putString("feed",f.toString()).putStringSet("seen",seen).putBoolean("initialized",true).putLong("last",System.currentTimeMillis()).putString("error","").apply();
-  if(count>0)RadarWorker.notifyNew(c,count);return count;
+  if(count>0)RadarWorker.notifyNew(c,fresh);return count;
  }
 }
