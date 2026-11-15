@@ -20,6 +20,7 @@ public final class WebScanner {
         public final String observed;
         public final String fingerprint;
         public final boolean matched;
+        public long observedAt=0;
         Observation(String observed, String fingerprint, boolean matched) {
             this.observed = observed;
             this.fingerprint = fingerprint;
@@ -32,6 +33,7 @@ public final class WebScanner {
     }
 
     public static Observation scan(Context context, Watch watch) throws IOException {
+        if(CargoReference.matches(watch))return CargoReference.scan(watch);
         return Engines.scan(context,watch);
     }
 
