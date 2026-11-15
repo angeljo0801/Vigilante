@@ -100,7 +100,7 @@ public final class RenderedPage {
                         handler.postDelayed(capture,wait*1000L);
                     }
                     @Override public void onReceivedError(WebView v,WebResourceRequest req,WebResourceError err){
-                        if(req.isForMainFrame())finish(null,"Error de navegación: "+err.getDescription());
+                        if(req.isForMainFrame())finish(null,err.getErrorCode()==WebViewClient.ERROR_HOST_LOOKUP?"DNS: no se pudo resolver el dominio. Comprueba la conexión y el DNS privado de Android; abre la misma URL en Chrome. No se ha actualizado el dato.":"Error de navegación: "+err.getDescription());
                     }
                     @Override public void onReceivedHttpError(WebView v,WebResourceRequest req,WebResourceResponse res){
                         if(req.isForMainFrame()){

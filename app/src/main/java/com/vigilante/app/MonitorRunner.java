@@ -68,14 +68,15 @@ public final class MonitorRunner {
             return error.getMessage()+"\n\nLas consultas automáticas quedan en espera. Abre la página y reintenta manualmente solo cuando el sitio lo permita.";
         } catch (Exception error) {
             String message = error.getMessage() == null ? error.toString() : error.getMessage();
+            final String detail=error instanceof java.net.UnknownHostException?"DNS: dominio no disponible. Comprueba Internet y DNS privado de Android.":message;
             WatchStore.mutate(context, id, current -> {
                 if (!current.sameTargetAs(before)) return;
                 current.lastChecked = now;
-                current.lastError = message;
-                record(current, now, "", message, false);
+                current.lastError = detail;
+                record(current, now, "", detail, false);
             });
             AlarmNotifier.refreshValue(context,WatchStore.find(context,id));
-            return "Error al consultar la web: " + message;
+            return "Error al consultar la web: " + detail;
         }
     }
 
