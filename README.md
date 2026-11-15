@@ -97,3 +97,6 @@ VIGILANTE-EDIT/1
 {"op":"patch","name":"Mi alarma","patch":{"times":"10:00","engine":"AUTO"}}
 ```
 Usa id exportado o nombre exacto único. op check solicita lectura; delete pausa de forma reversible. Los resultados se exportan manualmente desde la app; no se suben automáticamente. No requiere CargoConnect.
+
+### Conexión bidireccional privada (3.7)
+Crea un repositorio privado independiente, inicializado con README, y un token fine-grained limitado a ese repositorio con Contents read/write. Introduce ambos en la app, nunca en el chat. Activa ambos permisos. La app publica vigilante-state.json y consume vigilante-commands.json (array de objetos id UUID y command con el formato RemoteEdit). No usar repositorios públicos. Un repositorio por dispositivo. La sincronización es periódica y los resultados de lecturas aparecen en la siguiente sincronización.

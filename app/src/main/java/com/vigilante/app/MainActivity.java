@@ -536,6 +536,13 @@ public final class MainActivity extends Activity {
         Switch edits=new Switch(this);edits.setText("Autorizar cambios en alarmas existentes");edits.setTextColor(WHITE);edits.setChecked(ChatInbox.editsEnabled(this));edits.setOnCheckedChangeListener((v,on)->ChatInbox.allowEdits(this,on));form.addView(edits,bottomMargin(dp(48),10));
         Button export=button("Copiar alarmas y resultados para ChatGPT",CARD);form.addView(export,bottomMargin(dp(48),10));
         export.setOnClickListener(v->{android.content.ClipboardManager cb=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);cb.setPrimaryClip(android.content.ClipData.newPlainText("Vigilante",RemoteEdit.export(this)));});
+        Button privateSync=button("Configurar conexión bidireccional privada",BLUE);form.addView(privateSync,bottomMargin(dp(48),10));
+        privateSync.setOnClickListener(v->{
+            LinearLayout fields=column();fields.setPadding(dp(20),dp(12),dp(20),dp(12));
+            EditText repo=new EditText(this);repo.setHint("usuario/repositorio privado");repo.setText(PrivateSync.repo(this));fields.addView(repo);
+            EditText token=new EditText(this);token.setHint("Token GitHub (Contents lectura/escritura)");token.setInputType(129);fields.addView(token);
+            new AlertDialog.Builder(this).setTitle("Conexión privada").setView(fields).setNegativeButton("Cancelar",null).setNeutralButton("Desvincular",(d,x)->PrivateSync.clear(this)).setPositiveButton("Guardar",(d,x)->{try{PrivateSync.configure(this,repo.getText().toString(),token.getText().toString());ChatInbox.requestNow(this);Toast.makeText(this,"Conexión guardada; sincroniza para verificar",Toast.LENGTH_LONG).show();}catch(Exception e){Toast.makeText(this,e.getMessage(),Toast.LENGTH_LONG).show();}}).show();
+        });
         Button copy=button("Copiar código de vinculación",BLUE);form.addView(copy,bottomMargin(dp(48),10));
         TextView status=text(ChatInbox.lastStatus(this),13,MUTED,false);form.addView(status,bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT,10));
         Button sync=button("Sincronizar ahora",CARD);form.addView(sync,bottomMargin(dp(46),8));

@@ -75,6 +75,7 @@ public final class ChatInbox {
     }
     public static synchronized String sync(Context c)throws Exception{
         if(!enabled(c))return "Recepción desactivada.";
+        if(PrivateSync.configured(c))return status(c,PrivateSync.sync(c));
         KeyStore ks=keyStore();String recipient=recipient(ks);
         HttpURLConnection con=(HttpURLConnection)new URL(ROOT+recipient+".json?ts="+System.currentTimeMillis()).openConnection();
         con.setConnectTimeout(12000);con.setReadTimeout(15000);con.setInstanceFollowRedirects(false);con.setRequestProperty("Cache-Control","no-cache");
