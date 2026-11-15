@@ -18,9 +18,9 @@ public class RadarWorker extends Worker {
    Intent intent=new Intent(c,MainActivity.class).putExtra("finding_id",id).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);
    PendingIntent p=PendingIntent.getActivity(c,nid,intent,PendingIntent.FLAG_IMMUTABLE|PendingIntent.FLAG_UPDATE_CURRENT);
    Bitmap image=RadarImages.artwork(cat);
-   Notification.Builder b=new Notification.Builder(c,"findings").setSmallIcon(R.drawable.ic_radar).setContentTitle(name).setContentText(cat+" · "+o.optString("country")).setAutoCancel(true).setContentIntent(p).setLargeIcon(image).setStyle(new Notification.BigPictureStyle().bigPicture(image).setSummaryText(o.optString("summary"))).setGroup("trendradar-findings");
+   Notification.Builder b=new Notification.Builder(c,"findings").setSmallIcon(R.drawable.ic_radar).setContentTitle(name).setContentText(cat+" · "+o.optString("country")).setAutoCancel(true).setContentIntent(p).setLargeIcon(Bitmap.createScaledBitmap(image,96,96,true)).setStyle(new Notification.BigPictureStyle().bigPicture(image).setSummaryText(o.optString("summary"))).setGroup("trendradar-findings");
    m.notify(nid,b.build());
-   Bitmap photo=RadarImages.photo(c,o);if(photo!=null){b.setOnlyAlertOnce(true).setLargeIcon(photo).setStyle(new Notification.BigPictureStyle().bigPicture(photo).setSummaryText(o.optString("summary")));m.notify(nid,b.build());}
+   Bitmap photo=RadarImages.photo(c,o);if(photo!=null){int w=photo.getWidth(),h=photo.getHeight();float scale=Math.min(1f,640f/Math.max(w,h));Bitmap preview=Bitmap.createScaledBitmap(photo,Math.max(1,(int)(w*scale)),Math.max(1,(int)(h*scale)),true);Bitmap thumb=Bitmap.createScaledBitmap(preview,96,96,true);b.setOnlyAlertOnce(true).setLargeIcon(thumb).setStyle(new Notification.BigPictureStyle().bigPicture(preview).setSummaryText(o.optString("summary")));m.notify(nid,b.build());}
   }
   if(items.size()>1){PendingIntent p=PendingIntent.getActivity(c,0,new Intent(c,MainActivity.class),PendingIntent.FLAG_IMMUTABLE|PendingIntent.FLAG_UPDATE_CURRENT);m.notify(101,new Notification.Builder(c,"findings").setSmallIcon(R.drawable.ic_radar).setContentTitle("TrendRadar · "+items.size()+" nuevos resultados").setContentText("Abre el radar para ver todas las oportunidades.").setGroup("trendradar-findings").setGroupSummary(true).setAutoCancel(true).setContentIntent(p).build());}
  }
