@@ -1,0 +1,87 @@
+name: Compilar TrendRadar
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'trendradar/**'
+      - '.github/workflows/trendradar.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: TrendRadar APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Obtener repositorio
+        uses: actions/checkout@v4
+      - name: Configurar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Preparar Android SDK 35
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          SDKMANAGER="$(command -v sdkmanager || true)"
+          if [ -z "$SDKMANAGER" ]; then
+            SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -path '*/bin/sdkmanager' -type f | sort -V | tail -n 1)"
+          fi
+          test -x "$SDKMANAGER"
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+          if [ ! -f "$SDK_ROOT/platforms/android-35/android.jar" ] || [ ! -d "$SDK_ROOT/build-tools/34.0.0" ]; then
+            "$SDKMANAGER" --sdk_root="$SDK_ROOT" "platforms;android-35" "build-tools;34.0.0" "platform-tools"
+          fi
+          test -f "$SDK_ROOT/platforms/android-35/android.jar"
+          ls "$SDK_ROOT/build-tools"
+      - name: Configurar Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Pruebas unitarias
+        run: gradle -p trendradar :app:testDebugUnitTest --no-daemon --stacktrace
+      - name: Preparar firma permanente
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Falta el secreto $name. Configura la clave de firma permanente antes de compilar."
+              exit 1
+            fi
+          done
+          umask 077
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/trendradar-signing.keystore"
+          echo "TREND_KEYSTORE_PATH=$RUNNER_TEMP/trendradar-signing.keystore" >> "$GITHUB_ENV"
+      - name: Compilar APK firmada
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: gradle :app:assembleRelease --no-daemon --stacktrace
+      - name: Verificar firma de APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APKSIGNER="$ANDROID_HOME/build-tools/34.0.0/apksigner"
+          "$APKSIGNER" verify --print-certs trendradar/app/build/outputs/apk/release/app-release.apk
+      - name: Subir APK descargable
+        uses: actions/upload-artifact@v4
+        with:
+          name: TrendRadar-APK
+          path: trendradar/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+      - name: Limpiar clave temporal
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/trendradar-signing.keystore"

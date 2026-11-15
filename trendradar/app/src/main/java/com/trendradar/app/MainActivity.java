@@ -1,0 +1,45 @@
+package com.trendradar.app;
+import android.app.*;
+import android.os.*;
+import android.content.*;
+import android.graphics.Color;
+import android.net.Uri;
+import android.view.*;
+import android.widget.*;
+import android.text.InputType;
+import org.json.*;
+import java.util.*;
+public class MainActivity extends Activity {
+ LinearLayout root; String category="Todos"; boolean busy=false;
+ final int bg=Color.rgb(16,24,32),green=Color.rgb(74,222,128),light=Color.rgb(234,240,245);
+ String[] categories={"Todos","Productos","Innovaciones","Servicios","Empresas","IPO","Cuba"};
+ public void onCreate(Bundle b){super.onCreate(b);getWindow().setStatusBarColor(bg);getWindow().setNavigationBarColor(bg);if(Build.VERSION.SDK_INT>=33&&checkSelfPermission("android.permission.POST_NOTIFICATIONS")!=android.content.pm.PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"},1);RadarWorker.schedule(this);home();}
+ int dp(int n){return (int)(n*getResources().getDisplayMetrics().density+.5);}
+ TextView text(String s,int size){TextView v=new TextView(this);v.setText(s);v.setTextSize(size);v.setTextColor(light);v.setPadding(0,dp(6),0,dp(6));return v;}
+ void start(String title){ScrollView scroll=new ScrollView(this);root=new LinearLayout(this);root.setOrientation(1);root.setPadding(dp(16),dp(12),dp(16),dp(24));root.setBackgroundColor(bg);scroll.addView(root);setContentView(scroll);TextView t=text(title,26);t.setTextColor(green);root.addView(t);}
+ void label(String s){root.addView(text(s,15));}
+ void button(String s,Runnable fn){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setOnClickListener(v->fn.run());root.addView(b);}
+ EditText input(String title,String val,boolean number){label(title);EditText e=new EditText(this);e.setTextColor(light);e.setText(val);if(number)e.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_FLAG_DECIMAL);root.addView(e);return e;}
+ void message(String s){Toast.makeText(this,s,Toast.LENGTH_LONG).show();}
+ void home(){start("◉ TrendRadar");label("Inteligencia global · productos, servicios y empresas");button("Actualizar hallazgos",()->refresh());button("Ajustes y conexión bidireccional",()->settings());
+ HorizontalScrollView h=new HorizontalScrollView(this);LinearLayout bar=new LinearLayout(this);for(String k:categories){Button b=new Button(this);b.setText(k);b.setAllCaps(false);b.setOnClickListener(v->{category=k;home();});bar.addView(b);}h.addView(bar);root.addView(h);
+ long last=Store.prefs(this).getLong("last",0);label(last==0?"Sin sincronización todavía":"Última sincronización: "+new java.text.DateFormatSymbols().getMonths()[Calendar.getInstance().get(Calendar.MONTH)]+" · "+new java.util.Date(last));String err=Store.prefs(this).getString("error","");if(!err.isEmpty())label("Estado: "+err);
+ try{JSONObject f=Store.feed(this);JSONArray a=f.getJSONArray("items");int n=0;for(int i=0;i<a.length();i++){JSONObject item=a.getJSONObject(i);if(!category.equals("Todos")&&!category.equalsIgnoreCase(item.optString("category")))continue;n++;String title=item.optString("name","Hallazgo");button(title+"\n"+item.optString("category")+" · "+item.optString("country")+" · "+item.optString("date"),()->detail(item));}if(n==0)label("No hay hallazgos en esta sección. Conecta la cuenta y sincroniza; no se muestran datos inventados.");}catch(Exception e){label("No se pudo leer el feed.");}}
+ void refresh(){if(busy)return;busy=true;message("Sincronizando…");new Thread(()->{try{int n=Store.sync(this);runOnUiThread(()->{busy=false;home();message(n+" nuevos hallazgos");});}catch(Exception e){runOnUiThread(()->{busy=false;message(e.getMessage());});}}).start();}
+ void detail(JSONObject o){start(o.optString("name"));button("← Volver",()->home());label(o.optString("category")+" · "+o.optString("country")+" · "+o.optString("date"));label(o.optString("summary","Sin descripción"));label("Evidencia\n"+o.optString("evidence","Sin datos verificados"));label("Oportunidad\n"+o.optString("opportunity","Pendiente de análisis"));label("Riesgos\n"+o.optString("risks","Sin evaluación"));label("Siguiente paso\n"+o.optString("validation","Validar antes de invertir."));JSONArray sources=o.optJSONArray("sources");if(sources!=null)for(int i=0;i<sources.length();i++){String url=sources.optString(i);if(url.startsWith("https://")||url.startsWith("http://"))button("Abrir fuente "+(i+1),()->{try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(url)));}catch(Exception e){message("No se pudo abrir el enlace");}});}
+ button("Analizar oportunidad · calculadora",()->calculator(o));}
+ double num(EditText e){try{double n=Double.parseDouble(e.getText().toString());return Double.isFinite(n)&&n>=0?n:0;}catch(Exception x){return 0;}}
+ String money(double x){return String.format(Locale.US,"$%,.2f",x);}
+ void calculator(JSONObject o){start("Analizar oportunidad");button("← Volver",()->detail(o));label(o.optString("name"));label("Escenario editable en USD. Introduce datos reales; los valores vacíos no son estimaciones.");
+ String cat=o.optString("category");boolean equity=cat.equalsIgnoreCase("Empresas")||cat.equalsIgnoreCase("IPO");boolean service=cat.equalsIgnoreCase("Servicios");
+ if(equity){EditText buy=input("Precio de compra por acción","",true),target=input("Precio hipotético futuro","",true),shares=input("Cantidad de acciones","",true),fees=input("Comisiones totales","",true);TextView result=text("",16);button("Calcular escenario",()->{double b=num(buy),t=num(target),n=num(shares),f=num(fees);if(b<=0||n<=0||target.getText().toString().trim().isEmpty()){result.setText("Completa precio inicial, precio futuro hipotético y cantidad.");return;}double inv=b*n+f,g=(t-b)*n-f;result.setText("Capital: "+money(inv)+"\nGanancia o pérdida hipotética: "+money(g)+"\nROI: "+String.format(Locale.US,"%.1f%%",g/inv*100)+"\nNo predice el precio futuro.");});root.addView(result);return;}
+ EditText purchase=input(service?"Costo variable por cliente":"Compra unitaria","",true),shipping=input(service?"Otros costos variables por cliente":"Transporte unitario","",true),extra=input("Otros costos unitarios","",true),price=input("Precio de venta por "+(service?"cliente":"unidad"),"",true),units=input(service?"Clientes mensuales":"Unidades vendidas","",true),fixed=input(service?"Gastos fijos mensuales":"Gastos fijos del lote","",true),initial=input("Inversión inicial adicional","",true);TextView result=text("",16);
+ button("Calcular",()->{double c=num(purchase)+num(shipping)+num(extra),p=num(price),n=num(units),f=num(fixed),inv=num(initial)+c*n+f,g=(p-c)*n-f;if(p<=0||n<=0){result.setText("Completa precio y volumen.");return;}result.setText("Ingresos: "+money(p*n)+"\nCostos operativos: "+money(c*n+f)+"\nUtilidad operativa: "+money(g)+"\nCapital inicial estimado: "+money(inv)+"\nPunto de equilibrio: "+(p>c?String.valueOf((long)Math.ceil(f/(p-c))):"No viable con estos precios")+"\n"+(service&&g>0?"Recuperación aproximada: "+String.format(Locale.US,"%.1f meses",num(initial)/g):"ROI del escenario: "+(inv>0?String.format(Locale.US,"%.1f%%",(g-num(initial))/inv*100):"No calculable"))+"\nAntes de impuestos y costos no ingresados.");});root.addView(result);}
+ void settings(){start("Conexión y vigilancia");button("← Volver",()->home());label("Repositorio privado: Vigilante-Sync. Token de acceso fino limitado a ese repositorio, Contents: Read and write. Se cifra en AndroidKeyStore. No compartas el token por chat.");
+ EditText token=input("Token nuevo (dejar vacío para conservar)","",false);token.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);
+ button("Guardar conexión y sincronizar",()->{try{if(!token.getText().toString().trim().isEmpty()){Store.token(this,token.getText().toString());token.setText("");}home();refresh();}catch(Exception e){message(e.getMessage());}});
+ button("Desconectar token",()->{try{Store.token(this,"");message("Desconectado");home();}catch(Exception e){message(e.getMessage());}});
+ button("Cargar preferencias desde repositorio",()->{new Thread(()->{try{JSONObject env=Store.http(this,"trendradar-config.json","GET",null);JSONObject conf=Store.decode(env);String sha=env.getString("sha");runOnUiThread(()->editConfig(conf,sha));}catch(Exception e){runOnUiThread(()->message(e.getMessage()));}}).start();});
+ label("La investigación se ejecuta mediante el Radar Global de Tendencias de ChatGPT. La app consulta los resultados del repositorio aproximadamente cada 15 minutos si Android y la conexión lo permiten.");}
+ void editConfig(JSONObject conf,String sha){start("Preferencias remotas");button("← Volver",()->settings());EditText instructions=input("Prioridades de búsqueda e instrucciones",conf.optString("instructions"),false);instructions.setMinLines(5);button("Guardar cambios en repositorio",()->{String value=instructions.getText().toString();new Thread(()->{try{conf.put("instructions",value);conf.put("updated_at",new java.util.Date().toInstant().toString());Store.saveConfig(this,conf,sha);runOnUiThread(()->{message("Preferencias sincronizadas");settings();});}catch(Exception e){runOnUiThread(()->message(e.getMessage()));}}).start();});}
+}
