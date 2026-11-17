@@ -192,7 +192,7 @@
     }
   ],
   "protocol": {
-    "reports": "business-reports.json array, ChatGPT writes only; id,title,type,market,origin (radar|manual),status (research|needs_validation|ready_for_review|approved|rejected|launch_ready),recommendation (approve|revise|reject),approved boolean,summary,agents object keyed 1..27; each report status (complete|research),summary,findings,uncertainty,nextSteps,sources array {title,url}; processedRequestIds array per project. Only set approved true after explicit approve event and recommendation approve. Preapproval agents 1–9,26,27; others locked. No automatic spending, posting, contacting or buying. Preserve proposals array on each project (see proposal protocol).",
+    "reports": "business-reports.json array, ChatGPT writes only; id,title,type,market,origin (radar|manual),status (research|needs_validation|ready_for_review|approved|rejected|launch_ready),recommendation (approve|revise|reject),approved boolean,summary,agents object keyed 1..27; each report status (complete|research),summary,findings,uncertainty,nextSteps,sources array {title,url}; processedRequestIds array per project. Only set approved true after explicit approve event and recommendation approve. Preapproval agents 1–9,26,27; others locked. No automatic spending, posting, contacting or buying. Preserve proposals array on each project (see proposal protocol). Optional productSummary: concise sourcing/price/margin hypothesis for physical products.",
     "requests": "business-requests.json array, device appends {id,action:submit|approve|revise|reject|proposal,projectId,title,type,market,description,createdAt}. ChatGPT never overwrites requests; deduplicate using processedRequestIds. Preserve existing reports and IDs. Submit uses projectId. Radar IDs unique stable. Keep source links and distinction facts vs hypotheses."
   },
   "proposals": {
@@ -214,5 +214,11 @@
       "contact": "only supplied public sender contact"
     },
     "rules": "Before approval, proposal is an exploratory validation draft, not authorized commercial marketing or an offer; use conditional benefits and pilot/feedback invitation. After approval make a client-facing sales document, with verified features, scope, and caveats. No automatic sending. Never disclose internal strategy, profitability, private details, or claim confirmed customer problems without evidence. Provide a general proposal for researched projects and custom proposals on demand, in requested language; default EN for US, ES otherwise. Keep concise."
+  },
+  "discoveryPriority": {
+    "physicalProducts": 80,
+    "servicesAndSoftware": 20,
+    "preserveExisting": true,
+    "criteria": "Prefer low capital, simple logistics, demonstrable value, demand evidence, actual supplier quotes, competition and margins. Never treat advertised prices or popularity as confirmed sales."
   }
 }
