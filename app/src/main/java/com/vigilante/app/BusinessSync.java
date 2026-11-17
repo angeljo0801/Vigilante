@@ -11,6 +11,7 @@ final class BusinessSync {
  static JSONArray array(String s){try{return new JSONArray(s);}catch(Exception e){return new JSONArray();}}
  static JSONArray reports(Context c){return array(prefs(c).getString("reports","[]"));}
  static JSONArray requests(Context c){return array(prefs(c).getString("requests","[]"));}
+ static JSONArray visibleRequests(Context c){JSONArray all=array(prefs(c).getString("sent","[]"));JSONArray queued=requests(c);for(int i=0;i<queued.length();i++)all.put(queued.optJSONObject(i));return all;}
  static JSONObject report(Context c,String id){JSONArray a=reports(c);for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p!=null&&id.equals(p.optString("id")))return p;}return new JSONObject();}
  static synchronized String enqueue(Context c,String action,String project,String title,String type,String market,String description)throws JSONException{
   String id=UUID.randomUUID().toString();
@@ -40,7 +41,7 @@ final class BusinessSync {
     if(old!=null)body.put("sha",old.getString("sha"));
     PrivateSync.request(repo,token,out,body,false);
    }
-   prefs(c).edit().remove("requests").commit();
+   JSONArray sent=array(prefs(c).getString("sent","[]"));for(int i=0;i<local.length();i++){JSONObject x=local.optJSONObject(i);if(x!=null){x.put("sent",true);sent.put(x);}}prefs(c).edit().putString("sent",sent.toString()).remove("requests").commit();
   }
   String status="Sincronizado · "+reports(c).length()+" proyectos";
   prefs(c).edit().putString("status",status).putLong("last",System.currentTimeMillis()).apply();return status;
