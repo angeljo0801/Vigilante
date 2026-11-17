@@ -63,6 +63,6 @@ final class PrivateSync {
   JSONObject old=request(repo,token,path,null,true);
   JSONObject body=new JSONObject().put("message","Vigilante device sync").put("content",Base64.encodeToString(state.toString().getBytes(StandardCharsets.UTF_8),2));
   if(old!=null)body.put("sha",old.getString("sha"));
-  request(repo,token,path,body,false);return "Conexión privada activa · Modificaciones: "+applied;
+  request(repo,token,path,body,false);try{BusinessSync.sync(c);}catch(Exception e){BusinessSync.prefs(c).edit().putString("status","Error de sincronización: "+e.getMessage()).apply();}return "Conexión privada activa · Modificaciones: "+applied;
  }
 }

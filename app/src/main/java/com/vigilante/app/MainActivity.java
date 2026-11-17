@@ -170,6 +170,10 @@ public final class MainActivity extends Activity {
         status.addView(info);
         root.addView(status, bottomMargin(ViewGroup.LayoutParams.WRAP_CONTENT, 17));
 
+        Button business = button("Business Engine AI · Centro empresarial", BLUE);
+        business.setTextSize(16);
+        business.setOnClickListener(v -> startActivity(new android.content.Intent(this, BusinessActivity.class)));
+        root.addView(business,bottomMargin(dp(53),12));
         Button explore = button("Explorar una página web", BLUE);
         explore.setTextSize(16);
         explore.setOnClickListener(v -> showExplorer(""));

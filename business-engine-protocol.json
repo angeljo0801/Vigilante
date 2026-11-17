@@ -1,0 +1,198 @@
+{
+  "version": 1,
+  "agents": [
+    {
+      "id": 1,
+      "department": "Mercado",
+      "name": "Investigador de mercado",
+      "scope": "Demanda, tamaño, búsquedas, tendencias, estacionalidad, regiones y sustitutos",
+      "stage": "research"
+    },
+    {
+      "id": 2,
+      "department": "Mercado",
+      "name": "Investigador de competencia",
+      "scope": "Competidores, precios, anuncios, ofertas, posicionamiento y debilidades",
+      "stage": "research"
+    },
+    {
+      "id": 3,
+      "department": "Mercado",
+      "name": "Detector de problemas",
+      "scope": "Reseñas, quejas, necesidades insatisfechas y evidencia verificable",
+      "stage": "research"
+    },
+    {
+      "id": 4,
+      "department": "Mercado",
+      "name": "Investigador de clientes",
+      "scope": "Segmentos, compradores, hábitos, capacidad de pago y canales",
+      "stage": "research"
+    },
+    {
+      "id": 5,
+      "department": "Mercado",
+      "name": "Investigador de tendencias",
+      "scope": "Productos, servicios e innovaciones emergentes; oportunidades y fuentes",
+      "stage": "research"
+    },
+    {
+      "id": 6,
+      "department": "Producto y finanzas",
+      "name": "Diseñador de soluciones",
+      "scope": "Especificaciones, diferenciación, MVP y validación",
+      "stage": "research"
+    },
+    {
+      "id": 7,
+      "department": "Producto y finanzas",
+      "name": "Investigador de proveedores",
+      "scope": "Fabricantes, cotizaciones, MOQ, muestras, logística y calidad",
+      "stage": "research"
+    },
+    {
+      "id": 8,
+      "department": "Producto y finanzas",
+      "name": "Analista financiero",
+      "scope": "Costos, margen, CAC, escenarios, capital y punto de equilibrio",
+      "stage": "research"
+    },
+    {
+      "id": 9,
+      "department": "Producto y finanzas",
+      "name": "Especialista en ofertas",
+      "scope": "Posicionamiento, propuesta de valor, precios, garantías y objeciones",
+      "stage": "research"
+    },
+    {
+      "id": 10,
+      "department": "Marketing",
+      "name": "Estratega de marketing",
+      "scope": "Canales, audiencias, objetivos, presupuesto y lanzamiento",
+      "stage": "post_approval"
+    },
+    {
+      "id": 11,
+      "department": "Marketing",
+      "name": "Diseñador creativo",
+      "scope": "Identidad, conceptos visuales, brief de imágenes y anuncios",
+      "stage": "post_approval"
+    },
+    {
+      "id": 12,
+      "department": "Marketing",
+      "name": "Creador audiovisual",
+      "scope": "Guiones, reels, demostraciones y plan de producción",
+      "stage": "post_approval"
+    },
+    {
+      "id": 13,
+      "department": "Marketing",
+      "name": "Redactor publicitario",
+      "scope": "Textos, títulos, CTA, landing y mensajes comerciales",
+      "stage": "post_approval"
+    },
+    {
+      "id": 14,
+      "department": "Marketing",
+      "name": "Community manager",
+      "scope": "Calendario, publicación propuesta, respuestas y comunidades",
+      "stage": "post_approval"
+    },
+    {
+      "id": 15,
+      "department": "Marketing",
+      "name": "Publicidad pagada",
+      "scope": "Campañas, audiencias, pruebas, presupuesto y límites",
+      "stage": "post_approval"
+    },
+    {
+      "id": 16,
+      "department": "Ventas",
+      "name": "Buscador de clientes",
+      "scope": "Prospectos concretos, contactos públicos, criterios y evidencia",
+      "stage": "post_approval"
+    },
+    {
+      "id": 17,
+      "department": "Ventas",
+      "name": "Especialista en ventas",
+      "scope": "Propuestas, negociación, demostraciones y seguimiento",
+      "stage": "post_approval"
+    },
+    {
+      "id": 18,
+      "department": "Ventas",
+      "name": "Comercio electrónico",
+      "scope": "Canales, tienda, fichas, checkout y conversiones",
+      "stage": "post_approval"
+    },
+    {
+      "id": 19,
+      "department": "Ventas",
+      "name": "Especialista en alianzas",
+      "scope": "Influencers, afiliados, distribuidores, socios y condiciones",
+      "stage": "post_approval"
+    },
+    {
+      "id": 20,
+      "department": "Crecimiento",
+      "name": "Analista de datos",
+      "scope": "KPIs, instrumentación, CAC, conversiones y rentabilidad",
+      "stage": "post_approval"
+    },
+    {
+      "id": 21,
+      "department": "Crecimiento",
+      "name": "Experimentación",
+      "scope": "Hipótesis, A/B, tamaños de muestra y reglas de decisión",
+      "stage": "post_approval"
+    },
+    {
+      "id": 22,
+      "department": "Crecimiento",
+      "name": "Estratega de crecimiento",
+      "scope": "Escalado, mercados, nuevos canales y riesgos",
+      "stage": "post_approval"
+    },
+    {
+      "id": 23,
+      "department": "Operaciones",
+      "name": "Gestor de operaciones",
+      "scope": "Inventario, entregas, capacidad, procesos y costos",
+      "stage": "post_approval"
+    },
+    {
+      "id": 24,
+      "department": "Operaciones",
+      "name": "Atención al cliente",
+      "scope": "Preguntas, soporte, reclamaciones y tiempos",
+      "stage": "post_approval"
+    },
+    {
+      "id": 25,
+      "department": "Operaciones",
+      "name": "Fidelización",
+      "scope": "Recompras, referidos y retención",
+      "stage": "post_approval"
+    },
+    {
+      "id": 26,
+      "department": "Operaciones",
+      "name": "Riesgos y cumplimiento",
+      "scope": "Reglas, seguridad, propiedad intelectual y riesgos por mercado",
+      "stage": "research"
+    },
+    {
+      "id": 27,
+      "department": "Dirección",
+      "name": "Director general",
+      "scope": "Integra informes, contradicciones, decisión justificada y próximos pasos",
+      "stage": "research"
+    }
+  ],
+  "protocol": {
+    "reports": "business-reports.json array, ChatGPT writes only; id,title,type,market,origin (radar|manual),status (research|needs_validation|ready_for_review|approved|rejected|launch_ready),recommendation (approve|revise|reject),approved boolean,summary,agents object keyed 1..27; each report status (complete|research),summary,findings,uncertainty,nextSteps,sources array {title,url}; processedRequestIds array per project. Only set approved true after explicit approve event and recommendation approve. Preapproval agents 1–9,26,27; others locked. No automatic spending, posting, contacting or buying.",
+    "requests": "business-requests.json array, device appends {id,action:submit|approve|revise|reject,projectId,title,type,market,description,createdAt}. ChatGPT never overwrites requests; deduplicate using processedRequestIds. Preserve existing reports and IDs. Submit uses projectId. Radar IDs unique stable. Keep source links and distinction facts vs hypotheses."
+  }
+}
