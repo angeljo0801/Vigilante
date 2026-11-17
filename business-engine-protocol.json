@@ -216,9 +216,20 @@
     "rules": "Before approval, proposal is an exploratory validation draft, not authorized commercial marketing or an offer; use conditional benefits and pilot/feedback invitation. After approval make a client-facing sales document, with verified features, scope, and caveats. No automatic sending. Never disclose internal strategy, profitability, private details, or claim confirmed customer problems without evidence. Provide a general proposal for researched projects and custom proposals on demand, in requested language; default EN for US, ES otherwise. Keep concise."
   },
   "discoveryPriority": {
-    "physicalProducts": 80,
-    "servicesAndSoftware": 20,
+    "physicalProducts": {
+      "compareAtLeast": 5,
+      "addUpTo": 3
+    },
+    "services": {
+      "compareAtLeast": 3,
+      "addUpTo": 2
+    },
+    "software": {
+      "compareAtLeast": 3,
+      "addUpTo": 2
+    },
     "preserveExisting": true,
-    "criteria": "Prefer low capital, simple logistics, demonstrable value, demand evidence, actual supplier quotes, competition and margins. Never treat advertised prices or popularity as confirmed sales."
+    "requireEvidence": true,
+    "allowPartialResearch": true
   }
 }
