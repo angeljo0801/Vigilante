@@ -27,7 +27,7 @@ public final class BusinessActivity extends Activity {
  private Button btn(String s,Runnable action){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setTextColor(WHITE);b.setTextSize(14);b.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x553e7be7),bg(CARD),null));b.setMinHeight(dp(48));b.setPadding(dp(8),dp(8),dp(8),dp(8));b.setOnClickListener(v->action.run());return b;}
  private LinearLayout card(){LinearLayout l=col();l.setBackground(bg(CARD));l.setPadding(dp(14),dp(12),dp(14),dp(12));return l;}
  private void tile(LinearLayout r,String value,String label,Runnable action){Button c=btn(value+"\n"+label+"  ›",action);c.setTextSize(16);c.setMinHeight(dp(80));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.setMargins(dp(3),0,dp(3),0);r.addView(c,lp);}
- @Override public void onCreate(Bundle b){super.onCreate(b);getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);render();refresh();}
+ @Override public void onCreate(Bundle b){super.onCreate(b);getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);render();if(PrivateSync.configured(this))refresh();}
  @Override protected void onDestroy(){io.shutdown();super.onDestroy();}
  @Override public void onBackPressed(){if(!selected.isEmpty()){selected="";filter="";quickSection="";expanded.clear();render();}else if(!filter.isEmpty()){goHome();}else super.onBackPressed();}
  private void refresh(){if(busy){refreshAgain=true;Toast.makeText(this,"Sincronización en curso; nueva solicitud en cola",0).show();return;}busy=true;if(syncLabel!=null)syncLabel.setText("Sincronizando…");io.execute(()->{String s;try{s=BusinessSync.sync(this);}catch(Exception e){s="Error de sincronización: "+e.getMessage();}final String result=s;runOnUiThread(()->{busy=false;if(isFinishing()||isDestroyed())return;BusinessSync.prefs(this).edit().putString("status",result).apply();if(syncLabel!=null)syncLabel.setText(result);render();Toast.makeText(this,result,0).show();if(refreshAgain){refreshAgain=false;refresh();}});});}
@@ -59,7 +59,7 @@ public final class BusinessActivity extends Activity {
  if("all".equals(f)){JSONArray pending=BusinessSync.visibleRequests(this);for(int i=0;i<pending.length();i++){JSONObject j=pending.optJSONObject(i);if(j!=null&&"submit".equals(j.optString("action"))&&BusinessSync.report(this,j.optString("projectId")).length()==0)add(root,t((j.optBoolean("sent")?"Enviado · pendiente de investigación: ":"Por enviar: ")+j.optString("title"),14,MUTED,false));}}
  if(shown==0)add(root,t("No hay proyectos en esta categoría todavía. Las búsquedas continúan cada hora.",15,MUTED,false));
  }
- private static boolean isSoftware(JSONObject j){String type=j.optString("type").toLowerCase(java.util.Locale.ROOT);return type.contains("software")||type.contains("aplicaci")||type.contains("saas");}
+ private static boolean isSoftware(JSONObject j){String type=j.optString("type").toLowerCase(java.util.Locale.ROOT);return !type.startsWith("servicio")&&(type.contains("software")||type.contains("aplicaci")||type.contains("saas"));}
  private static boolean isProduct(JSONObject j){String type=j.optString("type").toLowerCase(java.util.Locale.ROOT);return type.contains("producto")||type.contains("physical")||type.equals("product");}
  private void showFilter(String f){filter=f;selected="";expanded.clear();departments.clear();resetScroll();render();}
  private void chooseProject(String section){
