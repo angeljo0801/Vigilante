@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "agents": [
     {
       "id": 1,
@@ -192,7 +192,7 @@
     }
   ],
   "protocol": {
-    "reports": "business-reports.json array, ChatGPT writes only; id,title,type,market,origin (radar|manual),status (research|needs_validation|ready_for_review|approved|rejected|launch_ready),recommendation (approve|revise|reject),approved boolean,summary,agents object keyed 1..27; each report status (complete|research),summary,findings,uncertainty,nextSteps,sources array {title,url}; processedRequestIds array per project. Only set approved true after explicit approve event and recommendation approve. Preapproval agents 1–9,26,27; others locked. No automatic spending, posting, contacting or buying. Preserve proposals array on each project (see proposal protocol). Optional productSummary: concise sourcing/price/margin hypothesis for physical products. Each opportunity (product, service or software) should include imageUrl (direct public HTTPS image), imageSource (original public page URL), imageCaption (Spanish, identify as third-party reference/competitor when appropriate). Use specific relevant images from verified public sources; never imply a reference is our product, customer or work. If no suitable image is available leave fields blank, add later; preserve previous verified images.",
+    "reports": "business-reports.json array, ChatGPT writes only; id,title,type,market,origin (radar|manual),status (research|needs_validation|ready_for_review|approved|rejected|launch_ready),recommendation (approve|revise|reject),approved boolean,summary,agents object keyed 1..27; each report status (complete|research),summary,findings,uncertainty,nextSteps,sources array {title,url}; processedRequestIds array per project. Only set approved true after explicit approve event and recommendation approve. Preapproval agents 1–9,26,27; others locked. No automatic spending, posting, contacting or buying. Preserve proposals array on each project (see proposal protocol). Optional productSummary: concise sourcing/price/margin hypothesis for physical products. Each opportunity (product, service or software) should include imageUrl (direct public HTTPS image), imageSource (original public page URL), imageCaption (Spanish, identify as third-party reference/competitor when appropriate). Use specific relevant images from verified public sources; never imply a reference is our product, customer or work. If no suitable image is available leave fields blank, add later; preserve previous verified images. Every project includes potential object per potential schema; app sums factors, orders by score, displays evidence confidence. Preserve existing scores unless meaningful new evidence.",
     "requests": "business-requests.json array, device appends {id,action:submit|approve|revise|reject|proposal,projectId,title,type,market,description,createdAt}. ChatGPT never overwrites requests; deduplicate using processedRequestIds. Preserve existing reports and IDs. Submit uses projectId. Radar IDs unique stable. Keep source links and distinction facts vs hypotheses."
   },
   "proposals": {
@@ -231,5 +231,22 @@
     "preserveExisting": true,
     "requireEvidence": true,
     "allowPartialResearch": true
+  },
+  "potential": {
+    "schema": {
+      "factors": {
+        "demand": "0–25",
+        "profit": "0–25",
+        "differentiation": "0–15",
+        "execution": "0–15",
+        "growth": "0–10",
+        "risk": "0–10, higher means more controllable risk"
+      },
+      "confidence": "baja|media|alta",
+      "reason": "Spanish concise rationale with evidence and uncertainty",
+      "nextEvidence": "most important next validation",
+      "evaluatedAt": "ISO date"
+    },
+    "rules": "For every project calculate the sum of the six integer factors, same rubric for all categories. Score is an estimated opportunity attractiveness, not probability of success. Unknowns lower points; confidence low for preliminary research, medium only with credible supporting evidence, high only with validated customers, realistic costs and execution evidence. Demand: proven purchase intent, not views; profit: contribution after all variable costs and CAC; differentiation: defensibility vs competitors; execution: low capital, sourcing, delivery, skills; growth: acquisition channels, repeat/scale; risk: safety, legality, intellectual property, returns and dependencies. Re-evaluate on meaningful evidence, preserve existing score unless evidence or rubric changes, never inflate for novelty. Ranking descending across all categories; rejected last, missing unscored. Score is not approval. Save potential object, not just a numeric score."
   }
 }

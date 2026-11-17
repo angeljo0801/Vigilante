@@ -23,5 +23,15 @@ public class BusinessDashboardTest {
  private void tap(String label){View v=find(root(),label,true);assertNotNull(label,v);assertTrue(label,v.performClick());}
  private void visible(String label){assertNotNull(label,find(root(),label,false));}
  @Test public void filtersOpenSeparatePagesAndProjects(){tap("Productos físicos");visible("Producto de prueba");assertNull(find(root(),"Jardinería de prueba",false));tap("Abrir proyecto");visible("Presentación comercial");tap("Volver a proyectos");tap("Volver al dashboard");tap("Servicios");visible("Jardinería de prueba");assertNull(find(root(),"Software de prueba",false));tap("Volver al dashboard");tap("Software / apps");visible("Software de prueba");}
+ @Test public void potentialRankingIsDescending() throws Exception {
+  JSONArray rows=BusinessSync.reports(a);
+  rows.getJSONObject(0).put("potential",new JSONObject().put("factors",new JSONObject().put("demand",10).put("profit",10).put("differentiation",5).put("execution",10).put("growth",5).put("risk",5)));
+  rows.getJSONObject(1).put("potential",new JSONObject().put("factors",new JSONObject().put("demand",20).put("profit",20).put("differentiation",10).put("execution",10).put("growth",8).put("risk",7)));
+  BusinessSync.prefs(a).edit().putString("reports",rows.toString()).commit();
+  java.lang.reflect.Method render=BusinessActivity.class.getDeclaredMethod("render");render.setAccessible(true);render.invoke(a);
+  visible("#1 · 75/100");visible("#2 · 45/100");
+  assertTrue(BusinessPotential.compare(rows.getJSONObject(1),rows.getJSONObject(0))<0);
+  assertEquals(-1,BusinessPotential.score(rows.getJSONObject(2)));
+ }
  @Test public void departmentsAndAgentsExpand(){tap("Departamentos");tap("Mercado");tap("Investigador de mercado");visible("Demanda, tamaño");visible("Consultar informe en proyecto");}
 }
