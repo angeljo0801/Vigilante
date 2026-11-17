@@ -1,0 +1,57 @@
+package com.vigilante.app;
+import android.app.*;
+import android.os.Bundle;
+import android.content.Intent;
+import android.net.Uri;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.Paint;
+import android.graphics.Canvas;
+import android.graphics.pdf.PdfDocument;
+import android.text.StaticLayout;
+import android.text.TextPaint;
+import android.text.Layout;
+import android.view.View;
+import android.widget.*;
+import androidx.core.content.FileProvider;
+import org.json.*;
+import java.io.*;
+import java.util.concurrent.*;
+
+public final class BusinessProposalActivity extends Activity {
+ private static final int BG=0xff0a101f,CARD=0xff162137,WHITE=0xfff1f6ff,MUTED=0xffa7b9d5,GREEN=0xff63ddad;
+ private static final String[] KEYS={"recipient","title","subtitle","problem","solution","benefits","deliverables","pricing","impact","nextSteps","sources","contact"};
+ private static final String[] ES={"Cliente / destinatario","Título comercial","Propuesta de valor","Necesidad u oportunidad","Nuestra solución","Beneficios para el cliente","Qué incluye","Precio y condiciones","Impacto estimado / supuestos","Próximo paso","Fuentes públicas (opcional)","Contacto de quien presenta"};
+ private static final String[] EN={"Prepared for","Commercial title","Value proposition","Need or opportunity","Our solution","Customer benefits","What is included","Pricing and terms","Estimated impact / assumptions","Next step","Public sources (optional)","Presenter contact"};
+ private final ExecutorService io=Executors.newSingleThreadExecutor();
+ private EditText[] fields=new EditText[KEYS.length];private Spinner lang;private LinearLayout root;private String project="",draftId="general";private TextView status;private boolean busy=false;private byte[] pending;private JSONObject data;
+ private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
+ @Override public void onCreate(Bundle state){super.onCreate(state);project=getIntent().getStringExtra("project");if(project==null||project.isEmpty()){finish();return;}getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);if(state!=null){draftId=state.getString("draft","general");}show();}
+ @Override protected void onSaveInstanceState(Bundle b){saveDraft();b.putString("draft",draftId);super.onSaveInstanceState(b);}
+ @Override protected void onDestroy(){io.shutdown();super.onDestroy();}
+ private TextView t(String s,int size,int color,boolean bold){TextView v=new TextView(this);v.setText(s);v.setTextColor(color);v.setTextSize(size);if(bold)v.setTypeface(Typeface.DEFAULT,Typeface.BOLD);return v;}
+ private void add(View v){LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(10);root.addView(v,lp);}
+ private Button button(String s,Runnable run){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setOnClickListener(v->run.run());return b;}
+ private String draftKey(){return "proposal:"+project+":"+draftId;}
+ private boolean approved(){return BusinessSync.report(this,project).optBoolean("approved");}
+ private JSONObject aiDraft(JSONObject p){JSONArray a=p.optJSONArray("proposals");if(a!=null)for(int i=0;i<a.length();i++){JSONObject j=a.optJSONObject(i);if(j!=null&&draftId.equals(j.optString("id")))return j;}return new JSONObject();}
+ private JSONObject loadDraft(JSONObject p){String s=BusinessSync.prefs(this).getString(draftKey(),"");if(!s.isEmpty())try{return new JSONObject(s);}catch(Exception ignored){}JSONObject j=aiDraft(p);if(j.length()>0)return j;JSONObject empty=new JSONObject();try{empty.put("title",p.optString("title"));empty.put("language",p.optString("market").toLowerCase(java.util.Locale.ROOT).contains("estados unidos")?"EN":"ES");}catch(Exception ignored){}return empty;}
+ private void show(){data=BusinessSync.report(this,project);if(data.length()==0){finish();return;}ScrollView sc=new ScrollView(this);sc.setBackgroundColor(BG);root=new LinearLayout(this);root.setOrientation(1);root.setPadding(dp(18),dp(20),dp(18),dp(28));sc.addView(root);setContentView(sc);
+  add(button("‹ Volver al proyecto",()->{saveDraft();finish();}));add(t("PRESENTACIÓN COMERCIAL",12,GREEN,true));add(t(data.optString("title"),26,WHITE,true));
+  add(t(approved()?"Propuesta de venta · revisa los datos antes de compartir":"Borrador de validación · no es una oferta aprobada",14,GREEN,true));
+  add(t("Edita el contenido, solicita una propuesta personalizada a ChatGPT y exporta un PDF independiente de los informes internos.",14,MUTED,false));
+  add(button("Elegir propuesta / cliente",this::choose));add(button("Solicitar presentación a ChatGPT",this::request));add(button("Actualizar propuestas desde ChatGPT",()->{saveDraft();sync();}));add(button("Cargar versión de ChatGPT (reemplaza la edición local)",()->{if(aiDraft(data).length()==0){Toast.makeText(this,"No hay versión recibida todavía",0).show();return;}new AlertDialog.Builder(this).setMessage("¿Reemplazar esta edición local?").setNegativeButton("Cancelar",null).setPositiveButton("Cargar",(d,w)->{BusinessSync.prefs(this).edit().remove(draftKey()).commit();show();}).show();}));
+  status=t(BusinessSync.prefs(this).getString("status",""),12,MUTED,false);add(status);
+  JSONObject j=loadDraft(data);lang=new Spinner(this);lang.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"ES","EN"}));lang.setSelection("EN".equals(j.optString("language"))?1:0);add(t("Idioma del documento",13,MUTED,true));add(lang);
+  for(int i=0;i<KEYS.length;i++){add(t(ES[i]+" / "+EN[i],13,MUTED,true));EditText e=new EditText(this);e.setTextColor(WHITE);e.setHintTextColor(MUTED);e.setText(j.optString(KEYS[i]));e.setGravity(android.view.Gravity.TOP);e.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);e.setMinLines(i<3?1:2);fields[i]=e;add(e);}
+  add(button("Guardar borrador",()->{saveDraft();Toast.makeText(this,"Borrador guardado",0).show();}));add(button("Vista previa del contenido",this::preview));add(button("Guardar PDF",()->export(false)));add(button("Compartir PDF",()->export(true)));
+ }
+ private JSONObject current(){JSONObject j=new JSONObject();try{j.put("language",lang.getSelectedItem().toString());for(int i=0;i<KEYS.length;i++)j.put(KEYS[i],fields[i].getText().toString().trim());}catch(Exception ignored){}return j;}
+ private void saveDraft(){if(lang!=null&&fields[0]!=null)BusinessSync.prefs(this).edit().putString(draftKey(),current().toString()).commit();}
+ private void choose(){saveDraft();java.util.ArrayList<String> names=new java.util.ArrayList<>(),ids=new java.util.ArrayList<>();names.add("General");ids.add("general");JSONArray a=data.optJSONArray("proposals");if(a!=null)for(int i=0;i<a.length();i++){JSONObject j=a.optJSONObject(i);if(j==null||"general".equals(j.optString("id")))continue;names.add(j.optString("recipient","Cliente")+" · "+j.optString("language"));ids.add(j.optString("id"));}new AlertDialog.Builder(this).setTitle("Presentaciones").setItems(names.toArray(new String[0]),(d,n)->{draftId=ids.get(n);show();}).show();}
+ private void request(){LinearLayout form=new LinearLayout(this);form.setOrientation(1);form.setPadding(dp(20),dp(8),dp(20),dp(8));EditText who=new EditText(this);who.setHint("Empresa o público objetivo");form.addView(who);Spinner language=new Spinner(this);language.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"EN","ES"}));form.addView(language);EditText notes=new EditText(this);notes.setHint("Detalles, condiciones, contacto propio (opcional)");notes.setMinLines(3);form.addView(notes);AlertDialog dlg=new AlertDialog.Builder(this).setTitle("Solicitar propuesta personalizada").setView(form).setNegativeButton("Cancelar",null).setPositiveButton("Enviar",null).create();dlg.setOnShowListener(d->dlg.getButton(-1).setOnClickListener(v->{if(who.getText().toString().trim().isEmpty()){who.setError("Escribe destinatario");return;}try{saveDraft();BusinessSync.enqueue(this,"proposal",project,who.getText().toString(),language.getSelectedItem().toString(),"",notes.getText().toString());dlg.dismiss();sync();}catch(Exception e){Toast.makeText(this,e.getMessage(),1).show();}}));dlg.show();}
+ private void sync(){if(busy)return;busy=true;status.setText("Sincronizando…");io.execute(()->{String result;try{result=BusinessSync.sync(this);}catch(Exception e){result="Error: "+e.getMessage();}final String r=result;runOnUiThread(()->{busy=false;if(isDestroyed()||isFinishing())return;BusinessSync.prefs(this).edit().putString("status",r).apply();show();Toast.makeText(this,r,1).show();});});}
+ private void preview(){JSONObject j=current();boolean en="EN".equals(j.optString("language"));StringBuilder b=new StringBuilder(approved()?"":en?"DISCOVERY DRAFT — NOT AN APPROVED OFFER\n\n":"BORRADOR DE VALIDACIÓN — NO ES UNA OFERTA APROBADA\n\n");for(int i=0;i<KEYS.length;i++){String value=j.optString(KEYS[i]);if(!value.isEmpty())b.append((en?EN:ES)[i]).append("\n").append(value).append("\n\n");}ScrollView sc=new ScrollView(this);TextView v=new TextView(this);v.setPadding(dp(18),dp(12),dp(18),dp(12));v.setText(b);sc.addView(v);new AlertDialog.Builder(this).setTitle("Vista previa").setView(sc).setPositiveButton("Cerrar",null).show();}
+ private void export(boolean share){JSONObject j=current();if(j.optString("title").isEmpty()||j.optString("benefits").isEmpty()||j.optString("solution").isEmpty()){Toast.makeText(this,"Completa título, solución y beneficios antes de exportar",1).show();return;}saveDraft();try{pending=ProposalPdf.create(j,approved());if(share){File folder=new File(getCacheDir(),"proposals");if(!folder.exists()&&!folder.mkdirs())throw new IOException("No se pudo crear carpeta");File f=new File(folder,"Propuesta-"+System.currentTimeMillis()+".pdf");try(FileOutputStream out=new FileOutputStream(f)){out.write(pending);}Uri uri=FileProvider.getUriForFile(this,getPackageName()+".proposalprovider",f);Intent send=new Intent(Intent.ACTION_SEND).setType("application/pdf").putExtra(Intent.EXTRA_STREAM,uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);send.setClipData(android.content.ClipData.newRawUri("PDF",uri));startActivity(Intent.createChooser(send,"Compartir PDF"));}else{Intent save=new Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("application/pdf").putExtra(Intent.EXTRA_TITLE,"Propuesta-"+System.currentTimeMillis()+".pdf");startActivityForResult(save,501);}}catch(Exception e){Toast.makeText(this,"No se pudo exportar: "+e.getMessage(),1).show();}}
+ @Override protected void onActivityResult(int req,int result,Intent i){super.onActivityResult(req,result,i);if(req==501&&result==RESULT_OK&&i!=null&&i.getData()!=null)try{if(pending==null)pending=ProposalPdf.create(current(),approved());try(OutputStream out=getContentResolver().openOutputStream(i.getData())){if(out==null)throw new IOException("Archivo no disponible");out.write(pending);}Toast.makeText(this,"PDF guardado",1).show();}catch(Exception e){Toast.makeText(this,"Error: "+e.getMessage(),1).show();}}
+}

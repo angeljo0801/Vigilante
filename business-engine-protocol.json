@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "agents": [
     {
       "id": 1,
@@ -192,7 +192,27 @@
     }
   ],
   "protocol": {
-    "reports": "business-reports.json array, ChatGPT writes only; id,title,type,market,origin (radar|manual),status (research|needs_validation|ready_for_review|approved|rejected|launch_ready),recommendation (approve|revise|reject),approved boolean,summary,agents object keyed 1..27; each report status (complete|research),summary,findings,uncertainty,nextSteps,sources array {title,url}; processedRequestIds array per project. Only set approved true after explicit approve event and recommendation approve. Preapproval agents 1–9,26,27; others locked. No automatic spending, posting, contacting or buying.",
-    "requests": "business-requests.json array, device appends {id,action:submit|approve|revise|reject,projectId,title,type,market,description,createdAt}. ChatGPT never overwrites requests; deduplicate using processedRequestIds. Preserve existing reports and IDs. Submit uses projectId. Radar IDs unique stable. Keep source links and distinction facts vs hypotheses."
+    "reports": "business-reports.json array, ChatGPT writes only; id,title,type,market,origin (radar|manual),status (research|needs_validation|ready_for_review|approved|rejected|launch_ready),recommendation (approve|revise|reject),approved boolean,summary,agents object keyed 1..27; each report status (complete|research),summary,findings,uncertainty,nextSteps,sources array {title,url}; processedRequestIds array per project. Only set approved true after explicit approve event and recommendation approve. Preapproval agents 1–9,26,27; others locked. No automatic spending, posting, contacting or buying. Preserve proposals array on each project (see proposal protocol).",
+    "requests": "business-requests.json array, device appends {id,action:submit|approve|revise|reject|proposal,projectId,title,type,market,description,createdAt}. ChatGPT never overwrites requests; deduplicate using processedRequestIds. Preserve existing reports and IDs. Submit uses projectId. Radar IDs unique stable. Keep source links and distinction facts vs hypotheses."
+  },
+  "proposals": {
+    "request": "action=proposal; projectId existing; title=recipient/company or customer segment; type=ES or EN; description=custom instructions. Deduplicate by processedRequestIds. Add a distinct proposal per request id; update existing generic proposal id=general when appropriate. Preserve other proposals.",
+    "schema": {
+      "id": "general or request id",
+      "recipient": "company or target audience",
+      "language": "ES or EN",
+      "title": "client-facing title",
+      "subtitle": "short value proposition",
+      "problem": "verified or conditional problem",
+      "solution": "how it works",
+      "benefits": "concrete buyer benefits, conditional where unverified",
+      "deliverables": "scope / features",
+      "pricing": "proposed price, terms, no fake discounts",
+      "impact": "transparent illustrative ROI, assumptions, no guarantees",
+      "nextSteps": "demo / pilot / call to action",
+      "sources": "public evidence links only; no internal costs or margins",
+      "contact": "only supplied public sender contact"
+    },
+    "rules": "Before approval, proposal is an exploratory validation draft, not authorized commercial marketing or an offer; use conditional benefits and pilot/feedback invitation. After approval make a client-facing sales document, with verified features, scope, and caveats. No automatic sending. Never disclose internal strategy, profitability, private details, or claim confirmed customer problems without evidence. Provide a general proposal for researched projects and custom proposals on demand, in requested language; default EN for US, ES otherwise. Keep concise."
   }
 }
