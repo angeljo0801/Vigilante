@@ -17,7 +17,7 @@ import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
 
 public final class AlarmNotifier {
-    private static final String CHANNEL = "vigilante_alarm_v1";
+    private static final String CHANNEL = "vigilante_alarm_v2";
     private static final String VALUE_CHANNEL = "vigilante_values_v1";
 
     private AlarmNotifier() {}
@@ -30,17 +30,18 @@ public final class AlarmNotifier {
                 values.setDescription("Último valor numérico y su cambio, sin sonido adicional");
                 values.setShowBadge(false);nm.createNotificationChannel(values);
             }
+            // Retire the old alarm-tone channel to prevent lingering repeating alarms.
+            if (nm.getNotificationChannel("vigilante_alarm_v1") != null) nm.deleteNotificationChannel("vigilante_alarm_v1");
             if (nm.getNotificationChannel(CHANNEL) != null) return;
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL, "Alarmas de Vigilante", NotificationManager.IMPORTANCE_HIGH);
             channel.setDescription("Sonido y vibración cuando una web alcanza el estado vigilado");
             channel.enableVibration(true);
             channel.setVibrationPattern(new long[]{0, 400, 180, 400, 180, 650});
-            Uri alarm = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
-            if (alarm == null) alarm = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+            Uri alarm = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
             if (alarm != null) {
                 AudioAttributes attributes = new AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
                         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                         .build();
                 channel.setSound(alarm, attributes);
@@ -84,7 +85,7 @@ public final class AlarmNotifier {
             .setStyle(new NotificationCompat.BigTextStyle().bigText(direction+"\n"+status))
             .setSubText(watch.name)
             .setContentIntent(pending).setWhen(watch.lastNumericAt).setShowWhen(true)
-            .setOngoing(true).setAutoCancel(false).setOnlyAlertOnce(true)
+            .setOngoing(true).setAutoCancel(false).setOnlyAlertOnce(true).setSilent(true)
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .setPriority(NotificationCompat.PRIORITY_LOW).build();
         NotificationManagerCompat.from(ctx).notify("numeric:"+watch.id,1,n);
@@ -108,7 +109,7 @@ public final class AlarmNotifier {
             .setContentTitle("Vigilante · Acción requerida: "+name)
             .setContentText(detail)
             .setStyle(new NotificationCompat.BigTextStyle().bigText(detail))
-            .setContentIntent(pending).setAutoCancel(true)
+            .setContentIntent(pending).setAutoCancel(true).setOnlyAlertOnce(true)
             .addAction(android.R.drawable.ic_menu_view,"Abrir página",pending)
             .setPriority(NotificationCompat.PRIORITY_HIGH).build();
         NotificationManagerCompat.from(ctx).notify(notificationId,n);
@@ -141,7 +142,8 @@ public final class AlarmNotifier {
                 .setContentTitle(title)
                 .setContentText(description)
                 .setStyle(new NotificationCompat.BigTextStyle().bigText(description))
-                .setCategory(NotificationCompat.CATEGORY_ALARM)
+                .setCategory(NotificationCompat.CATEGORY_EVENT)
+                .setOnlyAlertOnce(true)
                 .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setAutoCancel(true)
                 .setContentIntent(pending)
