@@ -18,6 +18,13 @@ public final class MonitorRunner {
         if (before.actionRequired && !manual) return "Esperando intervención manual. No se harán nuevas consultas automáticas.";
 
         long now = System.currentTimeMillis();
+        // Ignore duplicate or stale background work until the next configured slot.
+        if (!manual && before.lastChecked > 0) {
+            long due = before.times.isEmpty()
+                    ? before.lastChecked + Math.max(15, before.intervalMinutes) * 60_000L
+                    : Scheduler.nextTime(before.times, before.lastChecked);
+            if (now < due) return "Comprobación duplicada omitida.";
+        }
         try {
             WebScanner.Observation observation = WebScanner.scan(context, before);
             AtomicBoolean triggered = new AtomicBoolean(false);
@@ -37,6 +44,8 @@ public final class MonitorRunner {
                 current.lastMatched = observation.matched;
                 current.lastFingerprint = observation.fingerprint;
                 current.initialized = true;
+                // Manual refreshes of clock-based watches update the value silently.
+                if (manual && !current.times.isEmpty()) alert = false;
                 if (alert) current.lastAlert = now;
                 record(current, now, observation.observed, "", alert);
                 triggered.set(alert);
