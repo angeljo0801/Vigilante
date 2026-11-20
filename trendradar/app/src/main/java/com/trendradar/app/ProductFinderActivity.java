@@ -184,7 +184,7 @@ public class ProductFinderActivity extends Activity {
                 List<JSONObject> groups=ProductDeduper.group(allOffers);
                 if(!groups.isEmpty()){
                     LinearLayout summary=panel(results);
-                    summary.addView(strong(groups.size()+" productos únicos de "+allOffers.size()+" ofertas · precios de menor a mayor",15));
+                    summary.addView(heading(groups.size()+" productos únicos de "+allOffers.size()+" ofertas · precios de menor a mayor",15));
                 }
                 for(JSONObject item:groups)addProduct(item);
                 if (allOffers.isEmpty()) results.addView(text("Sin resultados de los proveedores conectados. Revisa claves y saldos o abre una tienda directamente.",14,0xffb7c9c4));
@@ -232,9 +232,9 @@ public class ProductFinderActivity extends Activity {
                 String[] labels=new String[offers.length()];
                 for(int i=0;i<offers.length();i++){
                     JSONObject o=offers.optJSONObject(i);
-                    double price=o==null?0:o.optDouble("price",0);
+                    double offerPrice=o==null?0:o.optDouble("price",0);
                     labels[i]=o==null?"Oferta":o.optString("shop")+" · "+
-                        (price>0?String.format(Locale.US,"$%,.2f",price):"Sin precio")+" · "+
+                        (offerPrice>0?String.format(Locale.US,"$%,.2f",offerPrice):"Sin precio")+" · "+
                         o.optString("provider","");
                 }
                 new AlertDialog.Builder(this).setTitle("Todas las ofertas de este artículo")
