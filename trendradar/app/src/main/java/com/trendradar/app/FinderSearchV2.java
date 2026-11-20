@@ -7,7 +7,28 @@ import java.util.*;
 
 /** One-credit search for many shops; no direct retailer scraping. */
 final class FinderSearchV2 {
-    static final String[] STORES = {"Todas", "Amazon", "SHEIN", "Temu", "Walmart", "eBay", "Target", "AliExpress", "Best Buy", "Home Depot", "Etsy"};
+    static final String[] STORES = {"Todas", "Amazon", "SHEIN", "Temu", "Walmart", "eBay", "Target", "AliExpress", "Best Buy", "Home Depot", "Etsy",
+        "Great Buy", "Kole Imports", "Four Seasons", "DollarDays", "Kedi Wholesale", "Bags in Bulk", "ToteBagFactory", "Rainbow Shops"};
+    private static final Map<String,String> WHOLESALE_DOMAINS = new LinkedHashMap<>();
+    static {
+        WHOLESALE_DOMAINS.put("Great Buy", "greatbuy.com");
+        WHOLESALE_DOMAINS.put("Kole Imports", "koleimports.com");
+        WHOLESALE_DOMAINS.put("Four Seasons", "4sgm.com");
+        WHOLESALE_DOMAINS.put("DollarDays", "dollardays.com");
+        WHOLESALE_DOMAINS.put("Kedi Wholesale", "kediwholesale.com");
+        WHOLESALE_DOMAINS.put("Bags in Bulk", "bagsinbulk.com");
+        WHOLESALE_DOMAINS.put("ToteBagFactory", "totebagfactory.com");
+        WHOLESALE_DOMAINS.put("Rainbow Shops", "rainbowshops.com");
+    }
+    static boolean isWholesale(String name) { return WHOLESALE_DOMAINS.containsKey(name); }
+    private static boolean permittedHost(String url,String domain) {
+        try {
+            java.net.URI uri=new java.net.URI(url);
+            String host=uri.getHost();
+            return "https".equalsIgnoreCase(uri.getScheme()) && uri.getUserInfo()==null &&
+                host!=null && (host.equalsIgnoreCase(domain) || host.toLowerCase(Locale.US).endsWith("."+domain));
+        } catch(Exception ignored) { return false; }
+    }
     static final class Result {
         final List<JSONObject> items = new ArrayList<>();
         String message = "";
@@ -15,6 +36,16 @@ final class FinderSearchV2 {
     private static String enc(String q) { return FinderBudget.enc(q); }
     static String storeUrl(String shop,String query) {
         String q=enc(query);
+        if (isWholesale(shop)) {
+            switch (shop) {
+                case "Great Buy": if(query.trim().isEmpty())return "https://greatbuy.com/collections/all-closeout"; break;
+                case "Kedi Wholesale": if(query.trim().isEmpty())return "https://kediwholesale.com/collections/all"; break;
+                case "Bags in Bulk": if(query.trim().isEmpty())return "https://bagsinbulk.com/collections/all"; break;
+                case "ToteBagFactory": if(query.trim().isEmpty())return "https://totebagfactory.com/collections/all"; break;
+            }
+            return query.trim().isEmpty()?"https://"+WHOLESALE_DOMAINS.get(shop):
+                "https://www.google.com/search?q="+enc("site:"+WHOLESALE_DOMAINS.get(shop)+" "+query);
+        }
         switch(shop) {
             case "Amazon":return "https://www.amazon.com/s?k="+q;
             case "SHEIN":return "https://us.shein.com/pdsearch/"+q+"/";
@@ -88,7 +119,14 @@ final class FinderSearchV2 {
         Result result=new Result();
         try {
             String url,cacheKey;
-            if(selected.equals("Amazon")) {
+            String supplierDomain=WHOLESALE_DOMAINS.get(selected);
+            if(supplierDomain!=null) {
+                // A Google Search result is a supplier catalogue link, not a verified priced offer.
+                // Never scrape supplier HTML or manufacture an estimated unit price.
+                String targeted="site:"+supplierDomain+" "+query;
+                url="https://serpapi.com/search.json?engine=google&google_domain=google.com&gl=us&hl=en&num=20&q="+enc(targeted)+"&start="+offset+"&api_key="+enc(key);
+                cacheKey="supplier:"+targeted+":"+offset;
+            } else if(selected.equals("Amazon")) {
                 url="https://serpapi.com/search.json?engine=amazon&amazon_domain=amazon.com&language=en_US&k="+enc(query)+"&page="+(offset/20+1)+"&api_key="+enc(key);
                 cacheKey="amazon:"+query+":"+offset;
             } else if(selected.equals("eBay")) {
@@ -100,18 +138,25 @@ final class FinderSearchV2 {
                 cacheKey="shopping:"+expanded+":"+offset;
             }
             JSONObject json=FinderBudget.search(context,url,cacheKey,key);
-            JSONArray a=json.optJSONArray(selected.equals("Amazon")||selected.equals("eBay")?"organic_results":"shopping_results");
-            if(a==null)a=json.optJSONArray("inline_shopping_results");
+            JSONArray a=json.optJSONArray(supplierDomain!=null||selected.equals("Amazon")||selected.equals("eBay")?"organic_results":"shopping_results");
+            if(a==null && supplierDomain==null)a=json.optJSONArray("inline_shopping_results");
             Set<String> seen=new HashSet<>();
             if(a!=null)for(int i=0;i<a.length()&&result.items.size()<100;i++) {
                 JSONObject row=a.optJSONObject(i);
                 if(row==null)continue;
-                String store=selected.equals("Amazon")||selected.equals("eBay")?selected:merchant(row.optString("source",""));
+                String store=supplierDomain!=null||selected.equals("Amazon")||selected.equals("eBay")?
+                    selected:merchant(row.optString("source",""));
                 if(store.isEmpty()||(!selected.equals("Todas")&&!selected.equals(store)))continue;
+                if(supplierDomain!=null&&!permittedHost(row.optString("link",""),supplierDomain))continue;
                 if(selected.equals("Amazon")&&row.optString("link","").isEmpty()&&!row.optString("asin","").isEmpty()) {
                     row.put("link","https://www.amazon.com/dp/"+enc(row.optString("asin")));
                 }
                 JSONObject product=normalize(store,row);
+                if(supplierDomain!=null) {
+                    product.put("wholesale",true);
+                    product.put("direct",true);
+                    product.put("price",0); // Search snippets don't establish a unit or case price.
+                }
                 String link=product.optString("url");
                 if(link.isEmpty()||product.optString("title").isEmpty())continue;
                 if(seen.add(link.split("[?#]",2)[0]))result.items.add(product);
@@ -120,7 +165,9 @@ final class FinderSearchV2 {
                 double priceA=a1.optDouble("price",0),priceB=b1.optDouble("price",0);
                 return Double.compare(priceA>0?priceA:Double.POSITIVE_INFINITY,priceB>0?priceB:Double.POSITIVE_INFINITY);
             });
-            result.message=result.items.size()+" resultados · máximo 1 consulta nueva a SerpAPI (o caché) · ordenados por precio, sin envío.";
+            result.message=supplierDomain!=null?
+                result.items.size()+" enlaces del catálogo de "+selected+" · confirmar precio, lote mínimo y envío en el proveedor.":
+                result.items.size()+" resultados · máximo 1 consulta nueva a SerpAPI (o caché) · ordenados por precio, sin envío.";
             if(result.items.isEmpty())result.message+=" Prueba la búsqueda directa en la tienda.";
         } catch(Exception e) {
             result.message="Búsqueda bloqueada o fallida: "+(e.getMessage()==null?"Sin conexión":e.getMessage());
