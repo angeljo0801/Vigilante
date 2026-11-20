@@ -40,7 +40,11 @@ final class ProductDeduper {
             return h+path;
         }catch(Exception e){return link.split("[?#]",2)[0];}
     }
+    static boolean equivalent(JSONObject a,JSONObject b){return sameProduct(a,b);}
     private static boolean sameProduct(JSONObject a,JSONObject b){
+        String conditionA=a.optString("condition","").toLowerCase(Locale.US);
+        String conditionB=b.optString("condition","").toLowerCase(Locale.US);
+        if(!conditionA.isEmpty()&&!conditionB.isEmpty()&&!conditionA.equals(conditionB))return false;
         String ua=normalizeLink(a.optString("url","")),ub=normalizeLink(b.optString("url",""));
         if(!ua.isEmpty()&&ua.equals(ub))return true;
         String modelA=a.optString("model",""),modelB=b.optString("model","");
