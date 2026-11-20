@@ -257,14 +257,19 @@ public class PhotoFinderActivity extends Activity {
             info.addView(label(term, 16, TEXT, true));
             info.addView(label(inferredAutomatically ? "Término inferido de una coincidencia visual: puede no representar el modelo exacto. Edita el nombre arriba y repite la búsqueda si es necesario." : "Se ha utilizado la identificación escrita por ti.", 12, MUTED, false));
         }
-        Map<String, JSONObject> visualMap = new LinkedHashMap<>();
-        for (JSONObject offer : lens.matches) visualMap.put(offer.optString("url"), offer);
-        List<JSONObject> visual = new ArrayList<>(visualMap.values());
-        Set<String> seen = new HashSet<>(visualMap.keySet());
+        List<JSONObject> all = new ArrayList<>();
+        all.addAll(lens.matches);
+        all.addAll(nameResults);
+        List<JSONObject> grouped = ProductDeduper.group(all);
+        List<JSONObject> visual = new ArrayList<>();
         List<JSONObject> byText = new ArrayList<>();
-        for (JSONObject p : nameResults) {
-            String url = p.optString("url");
-            if (!url.isEmpty() && seen.add(url)) byText.add(p);
+        for (JSONObject product : grouped) {
+            boolean fromPhoto = false;
+            for (JSONObject match : lens.matches) {
+                if (ProductDeduper.equivalent(product,match)) { fromPhoto = true; break; }
+            }
+            if (fromPhoto) visual.add(product);
+            else byText.add(product);
         }
         Comparator<JSONObject> cheapestFirst = (a,b) -> {
             double pa = a.optDouble("price", 0), pb = b.optDouble("price", 0);
@@ -341,7 +346,23 @@ public class PhotoFinderActivity extends Activity {
         p.addView(label(subtitle, 12, MUTED, false));
         if (offer.optBoolean("wholesale")) p.addView(label("Mayorista · verificar precio por caja, mínimo y transporte",12,MUTED,false));
         if (offer.optBoolean("out_of_stock")) p.addView(label("Agotado en la fuente", 12, 0xffffba7c, false));
-        if (!offer.optString("url").isEmpty()) button(p, "Abrir artículo en tienda", () -> open(offer.optString("url")));
+        if (!offer.optString("url").isEmpty()) button(p, "Abrir oferta más barata", () -> open(offer.optString("url")));
+        JSONArray offers = offer.optJSONArray("offers");
+        if (offers!=null&&offers.length()>1) {
+            button(p, "Ver "+offers.length()+" ofertas de este producto", () -> {
+                String[] choices = new String[offers.length()];
+                for (int i=0;i<offers.length();i++) {
+                    JSONObject entry=offers.optJSONObject(i);
+                    double amount=entry==null?0:entry.optDouble("price",0);
+                    choices[i]=entry==null?"Oferta":entry.optString("shop")+" · "+(amount>0?money(amount):"Sin precio");
+                }
+                new android.app.AlertDialog.Builder(this).setTitle("Ofertas del mismo producto")
+                    .setItems(choices,(dialog,index)->{
+                        JSONObject entry=offers.optJSONObject(index);
+                        if (entry!=null)open(entry.optString("url"));
+                    }).setNegativeButton("Cancelar",null).show();
+            });
+        }
     }
     private void open(String link) {
         try {
