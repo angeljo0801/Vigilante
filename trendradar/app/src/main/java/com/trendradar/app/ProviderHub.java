@@ -25,7 +25,7 @@ final class ProviderHub {
     private static final int MAX_JSON=2600000;
     static final class Balance {
         String name, status;
-        int used, cap, left, remote=-1;
+        int used, cap, left, remote=-1, remoteUsed=-1;
         boolean real, active;
     }
     static final class Results {
@@ -141,6 +141,7 @@ final class ProviderHub {
             if(online&&SERP.equals(provider)){
                 JSONObject remote=serpAccount(secret);
                 b.remote=remote.optInt("total_searches_left",-1);
+                b.remoteUsed=remote.optInt("this_month_usage",-1);
                 b.real=b.remote>=0;
                 if(remote.optDouble("plan_monthly_price",0)>0) {
                     b.left=0;b.status="Plan de pago detectado: bloqueado para evitar cargos";
@@ -152,6 +153,7 @@ final class ProviderHub {
                 JSONObject remote=searchAccount(secret);
                 if(remote==null)throw new IOException("No account details");
                 b.remote=remote.optInt("remaining_searches",-1);
+                b.remoteUsed=remote.optInt("current_month_usage",-1);
                 b.real=b.remote>=0;
                 if(remote.optBoolean("has_automatic_early_renewal_enabled",false)) {
                     b.left=0;b.status="Renovación anticipada activa: desactívala en SearchAPI";
