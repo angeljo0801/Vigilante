@@ -215,6 +215,7 @@ public class ProductFinderActivity extends Activity {
         double price = item.optDouble("price", 0);
         details.addView(heading(price > 0 ? String.format(Locale.US, "$%,.2f", price) : "Precio no disponible", 16));
         if (!item.optString("condition","").isEmpty()) details.addView(text("Estado: " + item.optString("condition"), 12, 0xffb7c9c4));
+        if (item.optBoolean("wholesale")) details.addView(text("Mayorista · verificar precio por caja, unidades y envío", 12, 0xffb7c9c4));
         double rating = item.optDouble("rating", 0);
         int reviews = item.optInt("reviews", 0);
         if (rating > 0) details.addView(text(String.format(Locale.US, "★ %.1f%s", rating, reviews > 0 ? " · " + reviews + " reseñas" : ""), 12, 0xffb7c9c4));
