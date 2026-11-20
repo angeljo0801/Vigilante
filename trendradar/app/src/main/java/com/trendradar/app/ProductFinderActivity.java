@@ -31,12 +31,13 @@ public class ProductFinderActivity extends Activity {
     private static final String[] STORES = FinderSearchV2.STORES;
     private LinearLayout root, results;
     private EditText query;
-    private Spinner store;
+    private StoreSelector storeSelector;
     private TextView status;
     private Button more, searchButton;
     private int offset = 0;
     private boolean loading = false;
-    private String currentQuery = "", currentStore = "Todas";
+    private String currentQuery = "";
+    private List<String> currentStores = new ArrayList<>();
 
     @Override public void onCreate(Bundle b) {
         super.onCreate(b);
@@ -79,21 +80,43 @@ public class ProductFinderActivity extends Activity {
     private void drawSearch() {
         screen("⌕ Product Finder");
         button(root, "← Volver a Tendencias", this::finish);
-        root.addView(text("Busca productos en Amazon, SHEIN, Temu y Walmart. Esta sección no modifica las tendencias ni sus alertas.", 14, 0xffb7c9c4));
+        root.addView(text("Selecciona una o varias tiendas y busca productos sin modificar tus tendencias ni alertas.", 14, 0xffb7c9c4));
         query = new EditText(this); query.setSingleLine(true); query.setHint("Ej. guantes, auriculares, mochilas");
         query.setHintTextColor(0xff8b9c9a); query.setTextColor(WHITE);
         query.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         root.addView(query);
-        store = new Spinner(this);
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, STORES);
-        store.setAdapter(adapter); root.addView(store);
+        storeSelector = new StoreSelector(this);
+        root.addView(storeSelector.view());
         searchButton = new Button(this); searchButton.setText("Buscar productos"); searchButton.setAllCaps(false);
         searchButton.setTextColor(WHITE); searchButton.setBackground(background(0xff28594c));
         root.addView(searchButton);
-        searchButton.setOnClickListener(v -> { offset = 0; currentQuery = query.getText().toString().trim(); currentStore = store.getSelectedItem().toString(); runSearch(true); });
-        button(root, "📷 Buscar por foto · comparar precios", () -> startActivity(new Intent(this, PhotoFinderActivity.class)));
+        searchButton.setOnClickListener(v -> {
+            offset = 0;
+            currentQuery = query.getText().toString().trim();
+            currentStores = storeSelector.getSelected();
+            if (currentStores.isEmpty()) {
+                Toast.makeText(this,"Marca al menos una tienda (círculos blancos).",Toast.LENGTH_LONG).show();
+                return;
+            }
+            if (currentQuery.length() < 2) {
+                Toast.makeText(this,"Escribe el nombre del artículo.",Toast.LENGTH_LONG).show();
+                return;
+            }
+            new AlertDialog.Builder(this)
+                .setTitle("Buscar en " + currentStores.size() + " tienda(s)")
+                .setMessage("Se buscará en cada tienda marcada. Se pueden usar hasta " + currentStores.size() +
+                    " créditos SerpAPI, menos si hay resultados en caché. ¿Continuar?")
+                .setNegativeButton("Cancelar",null)
+                .setPositiveButton("Buscar", (dialog,which)->runSearch(true))
+                .show();
+        });
+        button(root, "📷 Buscar por foto · comparar precios", () -> {
+            Intent intent = new Intent(this, PhotoFinderActivity.class);
+            intent.putStringArrayListExtra("selected_stores",new ArrayList<>(storeSelector.getSelected()));
+            startActivity(intent);
+        });
         button(root, "◉ Consultar créditos reales de SerpAPI (gratis)", this::showBalance);
-        root.addView(text("Modo ahorro activo: 1 consulta por búsqueda, caché 12 horas y protección de los últimos 2 créditos.", 12, 0xffb7c9c4));
+        root.addView(text("Modo ahorro: una consulta por cada tienda marcada (si no está en caché), caché 12 horas y reserva de 2 créditos.", 12, 0xffb7c9c4));
         button(root, "⚙ Configurar búsqueda (SerpAPI)", this::settings);
         root.addView(text("La consulta automática utiliza un proveedor de resultados estructurados, sin scraping directo de las tiendas desde el teléfono. Los precios, imágenes y enlaces pueden cambiar.", 12, 0xff9ab0aa));
         status = text("", 14, 0xffb7c9c4); root.addView(status);
@@ -103,7 +126,7 @@ public class ProductFinderActivity extends Activity {
         more.setVisibility(View.GONE); root.addView(more);
         more.setOnClickListener(v -> { offset += 20; runSearch(false); });
         if (!FinderSecrets.hasKey(this)) {
-            status.setText("Para mostrar resultados en la aplicación, configura tu clave SerpAPI. También puedes abrir directamente las cuatro tiendas.");
+            status.setText("Para mostrar resultados integrados, configura SerpAPI. Puedes abrir directamente cualquiera de las tiendas sin una clave.");
         }
         directStoreLinks(root, "");
     }
@@ -148,11 +171,12 @@ public class ProductFinderActivity extends Activity {
         if (secret.isEmpty()) { status.setText("Falta la clave SerpAPI. Abre Configurar búsqueda."); return; }
         loading = true; searchButton.setEnabled(false); more.setVisibility(View.GONE);
         if (reset) results.removeAllViews();
-        status.setText("Buscando " + currentQuery + " en " + currentStore + "…");
-        final String q = currentQuery, selected = currentStore;
+        status.setText("Buscando " + currentQuery + " en " + currentStores.size() + " tienda(s)…");
+        final String q = currentQuery;
+        final List<String> selected = new ArrayList<>(currentStores);
         final int pageStart = offset;
         new Thread(() -> {
-            FinderSearchV2.Result data = FinderSearchV2.search(getApplicationContext(), q, selected, pageStart, secret);
+            FinderSearchV2.Result data = FinderSearchV2.searchMany(getApplicationContext(), q, selected, pageStart, secret);
             runOnUiThread(() -> {
                 loading = false; searchButton.setEnabled(true);
                 status.setText(data.message);
@@ -227,8 +251,8 @@ public class ProductFinderActivity extends Activity {
     static String apiKey(Context context) throws Exception { return FinderSecrets.read(context); }
 
     /** Retailer offers based on a title inferred from a photograph. */
-    static List<JSONObject> searchPhotoOffers(Context context, String query, String key) {
-        return FinderSearchV2.search(context, query, "Todas", 0, key).items;
+    static List<JSONObject> searchPhotoOffers(Context context, String query, String key, Collection<String> stores) {
+        return FinderSearchV2.searchMany(context, query, stores, 0, key).items;
     }
 
     /** Independent keystore alias; never reuses the GitHub synchronization token. */
