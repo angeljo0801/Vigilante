@@ -28,7 +28,7 @@ import javax.crypto.spec.GCMParameterSpec;
 /** Product Finder: retailer search, intentionally separate from the TrendRadar findings feed. */
 public class ProductFinderActivity extends Activity {
     private static final int BG = 0xff101820, CARD = 0xff1b2933, GREEN = 0xff75dab3, WHITE = 0xffedf1f0;
-    private static final String[] STORES = {"Todas", "Amazon", "SHEIN", "Temu", "Walmart"};
+    private static final String[] STORES = FinderSearchV2.STORES;
     private LinearLayout root, results;
     private EditText query;
     private Spinner store;
@@ -92,6 +92,8 @@ public class ProductFinderActivity extends Activity {
         root.addView(searchButton);
         searchButton.setOnClickListener(v -> { offset = 0; currentQuery = query.getText().toString().trim(); currentStore = store.getSelectedItem().toString(); runSearch(true); });
         button(root, "📷 Buscar por foto · comparar precios", () -> startActivity(new Intent(this, PhotoFinderActivity.class)));
+        button(root, "◉ Consultar créditos reales de SerpAPI (gratis)", this::showBalance);
+        root.addView(text("Modo ahorro activo: 1 consulta por búsqueda, caché 12 horas y protección de los últimos 2 créditos.", 12, 0xffb7c9c4));
         button(root, "⚙ Configurar búsqueda (SerpAPI)", this::settings);
         root.addView(text("La consulta automática utiliza un proveedor de resultados estructurados, sin scraping directo de las tiendas desde el teléfono. Los precios, imágenes y enlaces pueden cambiar.", 12, 0xff9ab0aa));
         status = text("", 14, 0xffb7c9c4); root.addView(status);
@@ -105,11 +107,29 @@ public class ProductFinderActivity extends Activity {
         }
         directStoreLinks(root, "");
     }
+    private void showBalance() {
+        final String key;
+        try { key = FinderSecrets.read(this); }
+        catch (Exception e) { status.setText("No se pudo leer la clave."); return; }
+        if (key.isEmpty()) { status.setText("Configura primero tu clave SerpAPI."); return; }
+        status.setText("Consultando créditos…");
+        new Thread(() -> {
+            try {
+                JSONObject account = FinderBudget.account(key);
+                String message = account.optInt("total_searches_left",0) + " créditos disponibles / " +
+                    account.optInt("searches_per_month",0) + " mensuales · " +
+                    account.optString("plan_name","SerpAPI");
+                runOnUiThread(() -> status.setText(message + " · Consulta gratuita."));
+            } catch (Exception e) {
+                runOnUiThread(() -> status.setText("No se pudo consultar el saldo: " + e.getMessage()));
+            }
+        }).start();
+    }
     private void directStoreLinks(LinearLayout parent, String searchTerm) {
         parent.addView(heading("Buscar directamente en las tiendas", 17));
         for (int i = 1; i < STORES.length; i++) {
             final String name = STORES[i];
-            button(parent, "Abrir " + name, () -> open(FinderSearch.storeSearchUrl(name, searchTerm.isEmpty() && query != null ? query.getText().toString().trim() : searchTerm)));
+            button(parent, "Abrir " + name, () -> open(FinderSearchV2.storeUrl(name, searchTerm.isEmpty() && query != null ? query.getText().toString().trim() : searchTerm)));
         }
     }
     private void open(String url) {
@@ -132,7 +152,7 @@ public class ProductFinderActivity extends Activity {
         final String q = currentQuery, selected = currentStore;
         final int pageStart = offset;
         new Thread(() -> {
-            FinderSearch.Response data = FinderSearch.search(q, selected, pageStart, secret);
+            FinderSearchV2.Result data = FinderSearchV2.search(getApplicationContext(), q, selected, pageStart, secret);
             runOnUiThread(() -> {
                 loading = false; searchButton.setEnabled(true);
                 status.setText(data.message);
@@ -169,6 +189,7 @@ public class ProductFinderActivity extends Activity {
         details.addView(title);
         double price = item.optDouble("price", 0);
         details.addView(heading(price > 0 ? String.format(Locale.US, "$%,.2f", price) : "Precio no disponible", 16));
+        if (!item.optString("condition","").isEmpty()) details.addView(text("Estado: " + item.optString("condition"), 12, 0xffb7c9c4));
         double rating = item.optDouble("rating", 0);
         int reviews = item.optInt("reviews", 0);
         if (rating > 0) details.addView(text(String.format(Locale.US, "★ %.1f%s", rating, reviews > 0 ? " · " + reviews + " reseñas" : ""), 12, 0xffb7c9c4));
@@ -179,7 +200,7 @@ public class ProductFinderActivity extends Activity {
         screen("Product Finder · Configuración");
         button(root, "← Volver", this::drawSearch);
         root.addView(text("Para consultas dentro de la aplicación necesitas una clave SerpAPI personal. La clave no se incluye en el APK y se cifra en este dispositivo con AndroidKeyStore.", 14, 0xffb7c9c4));
-        root.addView(text("SerpAPI procesa búsquedas de Google Shopping, Google, Amazon y Google Lens por imagen; puede tener cuotas y costes. Las fotos subidas se procesan por un tercero y SerpAPI declara conservarlas hasta 30 días para depuración.", 13, 0xffb7c9c4));
+        root.addView(text("SerpAPI procesa búsquedas de Google Shopping, Google, Amazon, eBay y Google Lens por imagen; puede tener cuotas y costes. Las fotos subidas se procesan por un tercero y SerpAPI declara conservarlas hasta 30 días para depuración.", 13, 0xffb7c9c4));
         EditText input = new EditText(this); input.setHint("Clave SerpAPI");
         input.setHintTextColor(0xff8b9c9a); input.setTextColor(WHITE);
         input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
@@ -206,8 +227,8 @@ public class ProductFinderActivity extends Activity {
     static String apiKey(Context context) throws Exception { return FinderSecrets.read(context); }
 
     /** Retailer offers based on a title inferred from a photograph. */
-    static List<JSONObject> searchPhotoOffers(String query, String key) {
-        return FinderSearch.search(query, "Todas", 0, key).items;
+    static List<JSONObject> searchPhotoOffers(Context context, String query, String key) {
+        return FinderSearchV2.search(context, query, "Todas", 0, key).items;
     }
 
     /** Independent keystore alias; never reuses the GitHub synchronization token. */
