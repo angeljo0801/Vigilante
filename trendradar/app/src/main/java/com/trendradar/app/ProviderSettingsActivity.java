@@ -76,7 +76,7 @@ public class ProviderSettingsActivity extends Activity {
                 button(p,"Desconectar "+name,()->{
                     new android.app.AlertDialog.Builder(this)
                         .setTitle("Desconectar "+name)
-                        .setMessage("Se borrará la clave y el contador local. El consumo real de la cuenta externa no se reinicia.")
+                        .setMessage("Se borrará la clave guardada. Los contadores y límites gratuitos NO se reinician.")
                         .setNegativeButton("Cancelar",null)
                         .setPositiveButton("Desconectar",(d,w)->{ProviderHub.clear(this,name);refresh();})
                         .show();
@@ -102,7 +102,8 @@ public class ProviderSettingsActivity extends Activity {
                 for(Map.Entry<String,ProviderHub.Balance> e:all.entrySet()){
                     ProviderHub.Balance b=e.getValue();
                     TextView target=statuses.get(e.getKey());if(target==null)continue;
-                    target.setText("Usados por Product Finder: "+b.used+"/"+b.cap+
+                    target.setText("Consultas locales (incluye intentos): "+b.used+"/"+b.cap+
+                        (b.remoteUsed>=0?"\nConsumo real del período: "+b.remoteUsed:"")+
                         "\nDisponibles para la app: "+b.left+
                         (b.real?" (saldo real verificado: "+b.remote+")":" (estimación local)")+
                         "\n"+b.status);
