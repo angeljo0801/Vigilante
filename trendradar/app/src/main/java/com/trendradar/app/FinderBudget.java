@@ -103,6 +103,7 @@ final class FinderBudget {
     /** Block new searches unless account API confirms at least 3 credits. */
     private static void checkAvailable(String key) throws Exception {
         JSONObject info = account(key);
+        if (info.optDouble("plan_monthly_price",0)>0) throw new IOException("Plan SerpAPI de pago detectado: consultas bloqueadas para evitar cargos.");
         int remaining = info.optInt("total_searches_left", -1);
         if (remaining < 0) throw new IOException("No se pudo confirmar el saldo de SerpAPI. No se gastaron créditos.");
         if (remaining <= 2) throw new IOException("Quedan " + remaining + " créditos SerpAPI. Modo ahorro: se reservan 2; no se hacen consultas nuevas.");
