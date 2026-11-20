@@ -117,8 +117,8 @@ final class FinderSearchV2 {
                 if(seen.add(link.split("[?#]",2)[0]))result.items.add(product);
             }
             result.items.sort((a1,b1)->{
-                double a=a1.optDouble("price",0),b=b1.optDouble("price",0);
-                return Double.compare(a>0?a:Double.POSITIVE_INFINITY,b>0?b:Double.POSITIVE_INFINITY);
+                double priceA=a1.optDouble("price",0),priceB=b1.optDouble("price",0);
+                return Double.compare(priceA>0?priceA:Double.POSITIVE_INFINITY,priceB>0?priceB:Double.POSITIVE_INFINITY);
             });
             result.message=result.items.size()+" resultados · máximo 1 consulta nueva a SerpAPI (o caché) · ordenados por precio, sin envío.";
             if(result.items.isEmpty())result.message+=" Prueba la búsqueda directa en la tienda.";
