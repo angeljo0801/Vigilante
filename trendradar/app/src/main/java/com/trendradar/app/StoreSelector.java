@@ -35,6 +35,13 @@ final class StoreSelector {
         root.addView(count);
         String[] stores=FinderSearchV2.STORES;
         for(int j=1;j<stores.length;j+=2){
+            if (j==11) {
+                TextView section=label("MAYORISTAS Y LIQUIDACIONES · EE. UU.",13,GREEN,true);
+                section.setPadding(0,dp(14),0,dp(7));
+                root.addView(section);
+                TextView helper=label("Las fichas pueden requerir confirmar precio por caja, cantidad mínima y envío.",12,0xffb7c9c4,false);
+                root.addView(helper);
+            }
             LinearLayout row=new LinearLayout(context);row.setOrientation(LinearLayout.HORIZONTAL);
             root.addView(row);
             for(int k=j;k<Math.min(j+2,stores.length);k++){
