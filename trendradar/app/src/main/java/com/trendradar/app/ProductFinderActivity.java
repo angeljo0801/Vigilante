@@ -91,6 +91,7 @@ public class ProductFinderActivity extends Activity {
         searchButton.setTextColor(WHITE); searchButton.setBackground(background(0xff28594c));
         root.addView(searchButton);
         searchButton.setOnClickListener(v -> { offset = 0; currentQuery = query.getText().toString().trim(); currentStore = store.getSelectedItem().toString(); runSearch(true); });
+        button(root, "📷 Buscar por foto · comparar precios", () -> startActivity(new Intent(this, PhotoFinderActivity.class)));
         button(root, "⚙ Configurar búsqueda (SerpAPI)", this::settings);
         root.addView(text("La consulta automática utiliza un proveedor de resultados estructurados, sin scraping directo de las tiendas desde el teléfono. Los precios, imágenes y enlaces pueden cambiar.", 12, 0xff9ab0aa));
         status = text("", 14, 0xffb7c9c4); root.addView(status);
@@ -178,7 +179,7 @@ public class ProductFinderActivity extends Activity {
         screen("Product Finder · Configuración");
         button(root, "← Volver", this::drawSearch);
         root.addView(text("Para consultas dentro de la aplicación necesitas una clave SerpAPI personal. La clave no se incluye en el APK y se cifra en este dispositivo con AndroidKeyStore.", 14, 0xffb7c9c4));
-        root.addView(text("SerpAPI procesa resultados indexados de Google Shopping, Google y Amazon; es un proveedor externo y puede tener cuotas y costes.", 13, 0xffb7c9c4));
+        root.addView(text("SerpAPI procesa búsquedas de Google Shopping, Google, Amazon y Google Lens por imagen; puede tener cuotas y costes. Las fotos subidas se procesan por un tercero y SerpAPI declara conservarlas hasta 30 días para depuración.", 13, 0xffb7c9c4));
         EditText input = new EditText(this); input.setHint("Clave SerpAPI");
         input.setHintTextColor(0xff8b9c9a); input.setTextColor(WHITE);
         input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
@@ -199,6 +200,14 @@ public class ProductFinderActivity extends Activity {
         });
         button(root, "Abrir página de SerpAPI", () -> open("https://serpapi.com/"));
         root.addView(text("Se recomienda un backend propio con la clave como variable de entorno para distribuir la app. Esta versión hace consultas directas solo con tu clave local.", 12, 0xff9ab0aa));
+    }
+
+    /** Reuse the existing encrypted SerpAPI key for image lookup; never copy it to disk. */
+    static String apiKey(Context context) throws Exception { return FinderSecrets.read(context); }
+
+    /** Retailer offers based on a title inferred from a photograph. */
+    static List<JSONObject> searchPhotoOffers(String query, String key) {
+        return FinderSearch.search(query, "Todas", 0, key).items;
     }
 
     /** Independent keystore alias; never reuses the GitHub synchronization token. */
