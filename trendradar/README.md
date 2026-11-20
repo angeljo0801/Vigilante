@@ -12,5 +12,10 @@ Feed v1: {"schema":1,"updated_at":"ISO8601","items":[{"id":"id estable por halla
 ## Vigilancia
 El radar programado de ChatGPT investiga y publica resultados si tiene acceso al conector y permisos. Android WorkManager consulta cada 15 minutos aproximadamente, sujeto a batería, red y restricciones del sistema. La app también sincroniza manualmente. No es push instantáneo ni un scraper de todas las plataformas. No inventa datos si el feed está vacío. La calculadora usa valores del usuario, no predice beneficios.
 
+## Product Finder (nuevo en 1.2.0)
+En el inicio hay un botón **Product Finder · tiendas** que abre una pantalla independiente del feed de tendencias. Permite buscar por palabra clave en **Amazon, SHEIN, Temu y Walmart**, individualmente o todas a la vez, con tarjetas, imágenes, precios disponibles, reseñas cuando el proveedor las entrega, paginación y vínculos de producto. Los resultados comerciales proceden de SerpAPI (Amazon Search, Google Shopping y Google Search indexado). El APK **no hace scraping directo de las tiendas** ni inventa precios: si una ficha no trae un precio estructurado se muestra «Precio no disponible». Las imágenes son del proveedor y no se analiza HTML de las tiendas para completarlas. El botón de cada tienda permite abrir su búsqueda web aun sin clave.
+
+**Configuración**: Product Finder → Configurar búsqueda → clave SerpAPI personal. Esta clave se cifra con AndroidKeyStore en el teléfono y es independiente del token GitHub usado por el radar. Sin clave se muestran accesos directos a las tiendas, no resultados integrados. Las cuotas y costes dependen de SerpAPI. Para distribución pública, se recomienda proxy backend propio con la clave almacenada en servidor. No representa cifras reales de ventas ni asegura cobertura completa de catálogos.
+
 ## Compilación
 Gradle 8.9 + JDK 17 + Android SDK 35: `gradle -p trendradar :app:assembleDebug`. Workflow separado para release firmado. APK independiente, no modifica el APK Vigilante.
