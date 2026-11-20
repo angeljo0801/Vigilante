@@ -29,5 +29,10 @@ El modo ahorro es siempre activo: **12 horas de caché local** por búsqueda, pa
 
 El precio más bajo es **el de los resultados recuperados**, sin garantía de mismo modelo ni total con envío/impuestos. eBay puede listar artículos usados y precios «desde». Fuentes con cobertura limitada pueden mostrar el enlace directo en vez de ofrecer precios. No se incluyen claves privadas en el código y la caché elimina la clave en las respuestas guardadas.
 
+## Product Finder v1.5.0 — selección múltiple de tiendas
+La antigua lista desplegable de selección única se reemplazó por **10 botones de selección independientes**, con círculos blancos vacíos (desmarcados por defecto) y verdes al marcar. El usuario puede activar varias tiendas, desactivar individualmente, **Marcar todas** o **Limpiar**. No se ejecuta búsqueda cuando ninguna está marcada. La selección permite escoger entre Amazon, SHEIN, Temu, Walmart, eBay, Target, AliExpress, Best Buy, Home Depot y Etsy. El mismo selector aparece en «Buscar por foto» y hereda las tiendas ya marcadas al abrirlo; únicamente muestra las coincidencias visuales de esas tiendas.
+
+**Cobertura y crédito:** al buscar en varias tiendas, el motor consulta *individualmente* cada una de las elegidas, en vez de consultar globalmente y filtrar accidentalmente a tiendas populares. Por ello se advierte y pide confirmar antes de consumir como máximo un crédito por cada tienda que no esté en caché, aparte del análisis visual en la búsqueda por foto. La cuenta conserva la caché de 12 horas y la reserva de dos créditos. Se detienen las peticiones cuando el saldo de SerpAPI es insuficiente, sin inventar resultados. Los precios recuperados se ordenan de menor a mayor; no son una garantía de artículos idénticos ni de costo total con envío.
+
 ## Compilación
 Gradle 8.9 + JDK 17 + Android SDK 35: `gradle -p trendradar :app:assembleDebug`. Workflow separado para release firmado. APK independiente, no modifica el APK Vigilante.
