@@ -39,6 +39,7 @@ public class ProductFinderActivity extends Activity {
     private boolean loading = false;
     private String currentQuery = "";
     private List<String> currentStores = new ArrayList<>();
+    private final List<JSONObject> allOffers = new ArrayList<>();
 
     @Override public void onCreate(Bundle b) {
         super.onCreate(b);
@@ -105,8 +106,7 @@ public class ProductFinderActivity extends Activity {
             }
             new AlertDialog.Builder(this)
                 .setTitle("Buscar en " + currentStores.size() + " tienda(s)")
-                .setMessage("Se buscará en cada tienda marcada. Se pueden usar hasta " + currentStores.size() +
-                    " créditos SerpAPI, menos si hay resultados en caché. ¿Continuar?")
+                .setMessage("Se consultarán hasta tres proveedores por tienda si hace falta respaldo. Máximo teórico " + (currentStores.size()*3) + " consultas, normalmente menos por caché y disponibilidad. ¿Continuar?")
                 .setNegativeButton("Cancelar",null)
                 .setPositiveButton("Buscar", (dialog,which)->runSearch(true))
                 .show();
@@ -116,8 +116,9 @@ public class ProductFinderActivity extends Activity {
             intent.putStringArrayListExtra("selected_stores",new ArrayList<>(storeSelector.getSelected()));
             startActivity(intent);
         });
+        button(root, "◉ Créditos de SerpAPI, Serper y SearchAPI", () -> startActivity(new Intent(this,ProviderSettingsActivity.class)));
         button(root, "◉ Consultar créditos reales de SerpAPI (gratis)", this::showBalance);
-        root.addView(text("Modo ahorro: una consulta por cada tienda marcada (si no está en caché), caché 12 horas y reserva de 2 créditos.", 12, 0xffb7c9c4));
+        root.addView(text("Modo ahorro: tres proveedores, límites gratuitos independientes, caché 12 horas y agrupación de duplicados.", 12, 0xffb7c9c4));
         button(root, "⚙ Configurar búsqueda (SerpAPI)", this::settings);
         root.addView(text("La consulta automática utiliza un proveedor de resultados estructurados, sin scraping directo de las tiendas desde el teléfono. Los precios, imágenes y enlaces pueden cambiar.", 12, 0xff9ab0aa));
         status = text("", 14, 0xffb7c9c4); root.addView(status);
@@ -166,23 +167,27 @@ public class ProductFinderActivity extends Activity {
     private void runSearch(boolean reset) {
         if (loading) return;
         if (currentQuery.length() < 2) { status.setText("Escribe al menos dos caracteres."); return; }
-        String secret;
-        try { secret = FinderSecrets.read(this); }
-        catch (Exception e) { status.setText("Error leyendo la clave: " + e.getMessage()); return; }
-        if (secret.isEmpty()) { status.setText("Falta la clave SerpAPI. Abre Configurar búsqueda."); return; }
+        // Text searches can use any configured provider. Only photo recognition needs SerpAPI.
         loading = true; searchButton.setEnabled(false); more.setVisibility(View.GONE);
-        if (reset) results.removeAllViews();
+        if (reset) { allOffers.clear(); results.removeAllViews(); }
         status.setText("Buscando " + currentQuery + " en " + currentStores.size() + " tienda(s)…");
         final String q = currentQuery;
         final List<String> selected = new ArrayList<>(currentStores);
         final int pageStart = offset;
         new Thread(() -> {
-            FinderSearchV2.Result data = FinderSearchV2.searchMany(getApplicationContext(), q, selected, pageStart, secret);
+            ProviderHub.Results data = ProviderHub.find(getApplicationContext(), q, selected, pageStart);
             runOnUiThread(() -> {
                 loading = false; searchButton.setEnabled(true);
-                status.setText(data.message);
-                for (JSONObject item : data.items) addProduct(item);
-                if (data.items.isEmpty() && reset) results.addView(text("No hay productos verificados para esta búsqueda. Prueba otro término o abre la tienda directamente.", 14, 0xffb7c9c4));
+                status.setText(data.items.size() + " ofertas · " + String.join(" · ",data.notes));
+                allOffers.addAll(data.items);
+                results.removeAllViews();
+                List<JSONObject> groups=ProductDeduper.group(allOffers);
+                if(!groups.isEmpty()){
+                    LinearLayout summary=panel(results);
+                    summary.addView(strong(groups.size()+" productos únicos de "+allOffers.size()+" ofertas · precios de menor a mayor",15));
+                }
+                for(JSONObject item:groups)addProduct(item);
+                if (allOffers.isEmpty()) results.addView(text("Sin resultados de los proveedores conectados. Revisa claves y saldos o abre una tienda directamente.",14,0xffb7c9c4));
                 more.setVisibility(data.items.isEmpty() ? View.GONE : View.VISIBLE);
             });
         }).start();
@@ -208,7 +213,7 @@ public class ProductFinderActivity extends Activity {
         LinearLayout details = new LinearLayout(this); details.setOrientation(LinearLayout.VERTICAL);
         details.setPadding(dp(12), 0, 0, 0);
         row.addView(details, new LinearLayout.LayoutParams(0, -2, 1));
-        details.addView(text(item.optString("shop"), 12, GREEN));
+        details.addView(text(item.optString("shop")+" · "+item.optString("provider",""), 12, GREEN));
         TextView title = heading(item.optString("title", "Producto"), 15);
         title.setMaxLines(3); title.setEllipsize(android.text.TextUtils.TruncateAt.END);
         details.addView(title);
@@ -220,7 +225,25 @@ public class ProductFinderActivity extends Activity {
         int reviews = item.optInt("reviews", 0);
         if (rating > 0) details.addView(text(String.format(Locale.US, "★ %.1f%s", rating, reviews > 0 ? " · " + reviews + " reseñas" : ""), 12, 0xffb7c9c4));
         String url = item.optString("url");
-        if (!url.isEmpty()) button(p, item.optBoolean("direct") ? "Ver producto en " + item.optString("shop") : "Abrir ficha del producto", () -> open(url));
+        if (!url.isEmpty()) button(p,"Ver oferta más barata",()->open(url));
+        JSONArray offers=item.optJSONArray("offers");
+        if(offers!=null&&offers.length()>1){
+            button(p,"Ver "+offers.length()+" ofertas de este artículo",()->{
+                String[] labels=new String[offers.length()];
+                for(int i=0;i<offers.length();i++){
+                    JSONObject o=offers.optJSONObject(i);
+                    double price=o==null?0:o.optDouble("price",0);
+                    labels[i]=o==null?"Oferta":o.optString("shop")+" · "+
+                        (price>0?String.format(Locale.US,"$%,.2f",price):"Sin precio")+" · "+
+                        o.optString("provider","");
+                }
+                new AlertDialog.Builder(this).setTitle("Todas las ofertas de este artículo")
+                    .setItems(labels,(dialog,index)->{
+                        JSONObject o=offers.optJSONObject(index);
+                        if(o!=null)open(o.optString("url"));
+                    }).setNegativeButton("Cancelar",null).show();
+            });
+        }
     }
     private void settings() {
         screen("Product Finder · Configuración");
@@ -254,7 +277,7 @@ public class ProductFinderActivity extends Activity {
 
     /** Retailer offers based on a title inferred from a photograph. */
     static List<JSONObject> searchPhotoOffers(Context context, String query, String key, Collection<String> stores) {
-        return FinderSearchV2.searchMany(context, query, stores, 0, key).items;
+        return ProductDeduper.group(ProviderHub.find(context, query, stores, 0).items);
     }
 
     /** Independent keystore alias; never reuses the GitHub synchronization token. */
