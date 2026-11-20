@@ -61,7 +61,7 @@ final class FinderBudget {
     }
     static synchronized void putCache(Context c, String name, String key, JSONObject value) {
         try {
-            byte[] bytes = value.toString().getBytes(StandardCharsets.UTF_8);
+            byte[] bytes = value.toString().replace(key, "[REDACTED]").replace(enc(key), "[REDACTED]").getBytes(StandardCharsets.UTF_8);
             if (bytes.length > MAX_JSON) return;
             File f = file(c,name,key);
             try (FileOutputStream out = new FileOutputStream(f,false)) { out.write(bytes); }
