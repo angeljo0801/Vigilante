@@ -283,8 +283,10 @@ final class ProviderHub {
             }
             return products;
         }
-        JSONArray arr=raw.optJSONArray(SERPER.equals(provider)?"shopping":(SEARCH.equals(provider)&&
-            ("SHEIN".equals(store)||"AliExpress".equals(store))?"organic_results":"shopping_results");
+        String resultKey=SERPER.equals(provider)?"shopping":
+            (SEARCH.equals(provider)&&("SHEIN".equals(store)||"AliExpress".equals(store)))?
+                "organic_results":"shopping_results";
+        JSONArray arr=raw.optJSONArray(resultKey);
         if(arr==null)arr=raw.optJSONArray("organic_results");
         if(arr==null)arr=raw.optJSONArray("shopping_results");
         if(arr!=null)for(int i=0;i<arr.length()&&products.size()<40;i++){
