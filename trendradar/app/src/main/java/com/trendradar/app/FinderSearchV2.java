@@ -127,4 +127,42 @@ final class FinderSearchV2 {
         }
         return result;
     }
+
+    /** Search each checked store separately so its results do not disappear in global rankings.
+     *  Each uncached retailer search can consume a credit; FinderBudget enforces the reserve.
+     */
+    static Result searchMany(Context context,String query,Collection<String> selected,int offset,String key) {
+        Result aggregate=new Result();
+        if(selected==null||selected.isEmpty()){
+            aggregate.message="Selecciona al menos una tienda antes de buscar.";
+            return aggregate;
+        }
+        LinkedHashSet<String> names=new LinkedHashSet<>();
+        for(String name:selected)if(Arrays.asList(STORES).contains(name)&&!"Todas".equals(name))names.add(name);
+        if(names.isEmpty()){aggregate.message="Selecciona al menos una tienda.";return aggregate;}
+        Set<String> seen=new HashSet<>();
+        int failed=0;
+        StringBuilder issues=new StringBuilder();
+        for(String name:names){
+            Result part=search(context,query,name,offset,key);
+            if(part.message.startsWith("Búsqueda bloqueada o fallida:")){
+                failed++;
+                issues.append(name).append(": ").append(part.message).append(" ");
+                if(part.message.contains("Quedan ")||part.message.contains("saldo"))break;
+            }
+            for(JSONObject entry:part.items){
+                String url=entry.optString("url","");
+                String id=name+":"+url.split("[?#]",2)[0];
+                if(seen.add(id))aggregate.items.add(entry);
+            }
+        }
+        aggregate.items.sort((a,b)->{
+            double x=a.optDouble("price",0),y=b.optDouble("price",0);
+            return Double.compare(x>0?x:Double.POSITIVE_INFINITY,y>0?y:Double.POSITIVE_INFINITY);
+        });
+        aggregate.message=aggregate.items.size()+" resultados entre "+names.size()+" tiendas seleccionadas. "+
+            "Se consultó cada tienda por separado (se reutiliza la caché cuando existe).";
+        if(failed>0)aggregate.message+=" "+failed+" fuente(s) con errores: "+issues;
+        return aggregate;
+    }
 }
