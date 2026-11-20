@@ -2,7 +2,7 @@ plugins { id 'com.android.application' }
 android {
  namespace 'com.trendradar.app'
  compileSdk 35
- defaultConfig { applicationId 'com.trendradar.app'; minSdk 26; targetSdk 34; versionCode 5; versionName '1.4.0' }
+ defaultConfig { applicationId 'com.trendradar.app'; minSdk 26; targetSdk 34; versionCode 6; versionName '1.5.0' }
  signingConfigs { release {
  def path = System.getenv('TREND_KEYSTORE_PATH')
  if (path) { storeFile file(path); storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD'); keyAlias System.getenv('ANDROID_KEY_ALIAS'); keyPassword System.getenv('ANDROID_KEY_PASSWORD') }
