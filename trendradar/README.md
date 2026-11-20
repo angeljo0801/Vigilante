@@ -36,3 +36,10 @@ La antigua lista desplegable de selección única se reemplazó por **10 botones
 
 ## Compilación
 Gradle 8.9 + JDK 17 + Android SDK 35: `gradle -p trendradar :app:assembleDebug`. Workflow separado para release firmado. APK independiente, no modifica el APK Vigilante.
+
+## Product Finder v1.6.0 — proveedores estadounidenses de descuento y mayoristas
+La búsqueda por palabra y la búsqueda por foto incorporan ocho opciones adicionales, conservando las 10 tiendas anteriores: **Great Buy**, **Kole Imports**, **Four Seasons General Merchandise**, **DollarDays**, **Kedi Wholesale**, **Bags in Bulk**, **ToteBagFactory** y **Rainbow Shops**. Se muestran en un grupo «MAYORISTAS Y LIQUIDACIONES · EE. UU.» con los mismos círculos blancos desmarcados y selección múltiple que las tiendas originales. Se puede combinar cualquier proveedor con Amazon, SHEIN, Temu o las otras tiendas.
+
+**Limitación verificable:** SerpAPI Google Search localiza páginas públicas de cada proveedor mediante una consulta limitada a su dominio HTTPS. Estas coincidencias son *enlaces de catálogo*, no ofertas con precio/cantidad validada. Por seguridad, el precio aparece como «Precio no disponible» hasta que el proveedor permita comprobar directamente el lote, unidades, precio y envío; la app no estima valores ni realiza scraping del HTML de estas tiendas. El botón de la ficha abre la página oficial, y el botón de acceso directo abre la página inicial del mayorista o una búsqueda en Google limitada al dominio oficial. Cada proveedor marcado puede consumir un crédito SerpAPI si no hay caché, respetando las mismas reservas y avisos anteriores.
+
+Los resultados tradicionales con precio siguen ordenándose por precio anunciado (sin envío ni impuestos). **Comparar «el más barato» exige que sean equivalentes en marca/modelo, condición, unidades y costo entregado**. Una página de catálogo sin precio no compite en el ranking monetario. Ninguna fuente se consulta en segundo plano; la selección y las alertas del radar no cambian.
