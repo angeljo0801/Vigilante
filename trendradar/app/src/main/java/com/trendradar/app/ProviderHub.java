@@ -60,17 +60,13 @@ final class ProviderHub {
             Base64.encodeToString(aes.doFinal(value.trim().getBytes(StandardCharsets.UTF_8)),Base64.NO_WRAP);
         String id=prefId(provider);
         // New key => reset counter; same key does not reset limits.
-        String previous=prefs(c).getString(id+"_secret","");
-        SharedPreferences.Editor e=prefs(c).edit().putString(id+"_secret",stored);
-        if(!previous.isEmpty()){
-            try{if(!value.trim().equals(decode(previous)))e.putInt(id+"_used",0);}
-            catch(Exception ex){e.putInt(id+"_used",0);}
-        }
-        e.apply();
+        // Preserve local limits across reconnects and changed API keys.
+        prefs(c).edit().putString(id+"_secret",stored).apply();
     }
     static void clear(Context c,String provider){
         String id=prefId(provider);
-        prefs(c).edit().remove(id+"_secret").remove(id+"_used").apply();
+        // Disconnecting does not replenish promotional/trial credits.
+        prefs(c).edit().remove(id+"_secret").apply();
     }
     private static String decode(String stored)throws Exception{
         if(stored.isEmpty())return "";
@@ -228,7 +224,8 @@ final class ProviderHub {
     private static JSONObject normalize(JSONObject x,String provider,String requestedStore){
         JSONObject y=new JSONObject();
         try{
-            String url=x.optString("link",x.optString("url",""));
+            String url=x.optString("link","");
+            if(url.isEmpty())url=x.optString("url","");
             if(url.isEmpty())url=x.optString("product_link","");
             if(!url.startsWith("https://"))return null;
             String image=x.optString("thumbnail",x.optString("imageUrl",""));
@@ -237,10 +234,14 @@ final class ProviderHub {
             String title=x.optString("title","");
             if(title.length()<4)return null;
             String store=requestedStore;
-            if("Google Shopping".equals(store)){
-                store=hostShop(x.optString("source",x.optString("seller","")));
-            }
+            String reported=hostShop(x.optString("source",x.optString("seller","")));
+            if("Google Shopping".equals(store))store=reported;
+            else if(!reported.isEmpty()&&!reported.equals(store))return null;
             if(store.isEmpty())return null;
+            // Do not mislabel Google Shopping pages from unrelated stores.
+            String linkMerchant=hostShop(url);
+            if(!linkMerchant.isEmpty()&&!linkMerchant.equals(store))return null;
+            if(linkMerchant.isEmpty()&&reported.isEmpty())return null;
             y.put("shop",store);y.put("title",title);y.put("price",price(x));
             y.put("rating",x.optDouble("rating",0));y.put("reviews",x.optInt("reviews",0));
             y.put("image",image.startsWith("https://")?image:"");
@@ -299,6 +300,8 @@ final class ProviderHub {
         return products;
     }
     private static List<String> order(String store){
+        if(FinderSearchV2.isWholesale(store))
+            return Collections.singletonList(SERP); // wholesale catalog has no verified numeric unit price
         if("SHEIN".equals(store)||"AliExpress".equals(store))
             return Arrays.asList(SEARCH,SERPER,SERP);
         if("Amazon".equals(store)||"eBay".equals(store))
