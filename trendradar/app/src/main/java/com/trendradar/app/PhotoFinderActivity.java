@@ -87,7 +87,7 @@ public class PhotoFinderActivity extends Activity {
         scroll.addView(root); setContentView(scroll);
         root.addView(label("📷 Buscar por foto", 25, GREEN, true));
         button(root, "← Product Finder", this::finish);
-        root.addView(label("Selecciona una foto y compara precios publicados en Amazon, SHEIN, Temu y Walmart.", 14, MUTED, false));
+        root.addView(label("Selecciona una foto para localizar productos en Amazon, SHEIN, Temu, Walmart, eBay, Target, AliExpress, Best Buy, Home Depot y Etsy.", 14, MUTED, false));
         preview = new ImageView(this);
         preview.setBackground(background(PANEL));
         preview.setScaleType(ImageView.ScaleType.FIT_CENTER);
@@ -208,14 +208,14 @@ public class PhotoFinderActivity extends Activity {
         output.removeAllViews(); state.setText("Buscando coincidencias visuales…");
         new Thread(() -> {
             try {
-                LensData lens = LensClient.lookup(bytes, key);
+                LensData lens = LensClient.lookup(getApplicationContext(), bytes, key);
                 String term = manual.isEmpty() ? lens.guess : manual;
                 if (term.length() > 110) term = term.substring(0, 110);
                 List<JSONObject> byName = new ArrayList<>();
                 if (term.length() >= 3) {
                     final String finalTerm = term;
-                    runOnUiThread(() -> state.setText("Comparando ofertas de las cuatro tiendas para: " + finalTerm));
-                    byName = ProductFinderActivity.searchPhotoOffers(term, key);
+                    runOnUiThread(() -> state.setText("Comparando precios entre diez tiendas para: " + finalTerm));
+                    byName = ProductFinderActivity.searchPhotoOffers(getApplicationContext(), term, key);
                 }
                 final List<JSONObject> named = byName;
                 final String searched = term;
@@ -272,7 +272,7 @@ public class PhotoFinderActivity extends Activity {
             cheaper.addView(label("Puede ser otro modelo. Comprueba el artículo antes de considerarlo una oferta equivalente.", 12, MUTED, false));
         }
         output.addView(label("Coincidencias visuales · " + visual.size(), 19, GREEN, true));
-        if (visual.isEmpty()) output.addView(label("No aparecieron ofertas visuales dentro de las cuatro tiendas.", 13, MUTED, false));
+        if (visual.isEmpty()) output.addView(label("No aparecieron coincidencias visuales entre las diez tiendas.", 13, MUTED, false));
         for (JSONObject offer : visual) offerCard(offer, "Imagen coincidente · verificar referencia");
         output.addView(label("Otras opciones por nombre · " + byText.size(), 19, GREEN, true));
         if (byText.isEmpty()) output.addView(label("No aparecieron alternativas adicionales por texto, o no se pudo identificar un nombre útil.", 13, MUTED, false));
@@ -372,15 +372,9 @@ public class PhotoFinderActivity extends Activity {
                 return readJson(c.getInputStream(),200000);
             } finally { c.disconnect(); }
         }
-        static JSONObject getLens(String id, String key) throws Exception {
+        static JSONObject getLens(android.content.Context c, String id, String key) throws Exception {
             String url = "https://serpapi.com/search.json?engine=google_lens&type=visual_matches&country=us&hl=en&image_id=" + enc(id) + "&api_key=" + enc(key);
-            HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
-            c.setInstanceFollowRedirects(false);
-            c.setConnectTimeout(12000); c.setReadTimeout(30000);
-            try {
-                if (c.getResponseCode() != 200) throw new IOException("Google Lens HTTP " + c.getResponseCode());
-                return readJson(c.getInputStream(),3500000);
-            } finally { c.disconnect(); }
+            return FinderBudget.search(c, url, "lens-id:"+id, key);
         }
         static String shop(String link) {
             try {
@@ -391,6 +385,13 @@ public class PhotoFinderActivity extends Activity {
                 if (host.equals("shein.com") || host.endsWith(".shein.com")) return "SHEIN";
                 if (host.equals("temu.com") || host.endsWith(".temu.com")) return "Temu";
                 if (host.equals("walmart.com") || host.endsWith(".walmart.com")) return "Walmart";
+                if (host.equals("ebay.com") || host.endsWith(".ebay.com")) return "eBay";
+                if (host.equals("target.com") || host.endsWith(".target.com")) return "Target";
+                if (host.equals("aliexpress.com") || host.endsWith(".aliexpress.com") ||
+                    host.equals("aliexpress.us") || host.endsWith(".aliexpress.us")) return "AliExpress";
+                if (host.equals("bestbuy.com") || host.endsWith(".bestbuy.com")) return "Best Buy";
+                if (host.equals("homedepot.com") || host.endsWith(".homedepot.com")) return "Home Depot";
+                if (host.equals("etsy.com") || host.endsWith(".etsy.com")) return "Etsy";
             } catch (Exception ignored) { }
             return "";
         }
@@ -408,11 +409,18 @@ public class PhotoFinderActivity extends Activity {
             if (candidate.length() > 110) candidate = candidate.substring(0,110);
             return candidate;
         }
-        static LensData lookup(byte[] bytes, String key) throws Exception {
-            JSONObject upload = postImage(bytes,key);
-            String id = upload.optString("image_id","");
-            if (id.isEmpty()) throw new IOException("El proveedor no devolvió image_id");
-            JSONObject result = getLens(id,key);
+        static LensData lookup(android.content.Context c, byte[] bytes, String key) throws Exception {
+            // Repeating the same photo within 12h reuses the parsed Lens response, without uploading the image.
+            String cacheTag = "photo-image:"+FinderBudget.imageHash(bytes);
+            JSONObject result = FinderBudget.cached(c,cacheTag,key);
+            if (result == null) {
+                FinderBudget.ensureAvailable(key);
+                JSONObject upload = postImage(bytes,key);
+                String id = upload.optString("image_id","");
+                if (id.isEmpty()) throw new IOException("El proveedor no devolvió image_id");
+                result = getLens(c,id,key);
+                FinderBudget.putCache(c,cacheTag,key,result);
+            }
             LensData data = new LensData();
             JSONArray matches = result.optJSONArray("visual_matches");
             if (matches == null) matches = new JSONArray();
