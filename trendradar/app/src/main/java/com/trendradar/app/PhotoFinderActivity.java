@@ -40,6 +40,7 @@ public class PhotoFinderActivity extends Activity {
     private EditText productName;
     private TextView state;
     private Button searchButton;
+    private StoreSelector storeSelector;
     private byte[] imageBytes;
     private boolean loading = false;
     private String inferred = "";
@@ -103,6 +104,10 @@ public class PhotoFinderActivity extends Activity {
         productName.setHint("Marca o modelo exacto (opcional)");
         root.addView(productName);
         root.addView(label("Para comparar el mismo modelo, escribe marca, referencia, talla o capacidad cuando la sepas. Sin esos datos, algunas ofertas pueden ser similares.", 12, MUTED, false));
+        storeSelector = new StoreSelector(this);
+        java.util.ArrayList<String> prior = getIntent().getStringArrayListExtra("selected_stores");
+        if (prior != null) storeSelector.setSelected(prior);
+        root.addView(storeSelector.view());
         searchButton = new Button(this);
         searchButton.setText("Identificar foto y buscar el menor precio");
         searchButton.setAllCaps(false); searchButton.setTextColor(TEXT);
@@ -197,6 +202,18 @@ public class PhotoFinderActivity extends Activity {
     }
     private void search() {
         if (loading) return;
+        final List<String> selected = storeSelector.getSelected();
+        if (selected.isEmpty()) { state.setText("Marca al menos una tienda con los círculos blancos."); return; }
+        if (imageBytes == null) { state.setText("Selecciona primero una imagen."); return; }
+        new android.app.AlertDialog.Builder(this)
+            .setTitle("Buscar foto en " + selected.size() + " tienda(s)")
+            .setMessage("La primera identificación visual puede usar un crédito SerpAPI y cada tienda marcada hasta uno adicional, menos si está en caché. ¿Continuar?")
+            .setNegativeButton("Cancelar",null)
+            .setPositiveButton("Buscar",(dialog,which)->executePhotoSearch(selected))
+            .show();
+    }
+    private void executePhotoSearch(List<String> selected) {
+        if (loading) return;
         if (imageBytes == null) { state.setText("Selecciona primero una imagen."); return; }
         String key;
         try { key = ProductFinderActivity.apiKey(this); }
@@ -209,13 +226,14 @@ public class PhotoFinderActivity extends Activity {
         new Thread(() -> {
             try {
                 LensData lens = LensClient.lookup(getApplicationContext(), bytes, key);
+                lens.matches.removeIf(x -> !selected.contains(x.optString("shop")));
                 String term = manual.isEmpty() ? lens.guess : manual;
                 if (term.length() > 110) term = term.substring(0, 110);
                 List<JSONObject> byName = new ArrayList<>();
                 if (term.length() >= 3) {
                     final String finalTerm = term;
-                    runOnUiThread(() -> state.setText("Comparando precios entre diez tiendas para: " + finalTerm));
-                    byName = ProductFinderActivity.searchPhotoOffers(getApplicationContext(), term, key);
+                    runOnUiThread(() -> state.setText("Comparando precios entre " + selected.size() + " tiendas para: " + finalTerm));
+                    byName = ProductFinderActivity.searchPhotoOffers(getApplicationContext(), term, key, selected);
                 }
                 final List<JSONObject> named = byName;
                 final String searched = term;
@@ -271,8 +289,8 @@ public class PhotoFinderActivity extends Activity {
             cheaper.addView(label("Hay una alternativa por nombre más barata: " + money(nameBest.optDouble("price")) + " · " + nameBest.optString("shop"), 14, GREEN, true));
             cheaper.addView(label("Puede ser otro modelo. Comprueba el artículo antes de considerarlo una oferta equivalente.", 12, MUTED, false));
         }
-        output.addView(label("Coincidencias visuales · " + visual.size(), 19, GREEN, true));
-        if (visual.isEmpty()) output.addView(label("No aparecieron coincidencias visuales entre las diez tiendas.", 13, MUTED, false));
+        output.addView(label("Coincidencias visuales en tiendas seleccionadas · " + visual.size(), 19, GREEN, true));
+        if (visual.isEmpty()) output.addView(label("No aparecieron coincidencias visuales en las tiendas marcadas.", 13, MUTED, false));
         for (JSONObject offer : visual) offerCard(offer, "Imagen coincidente · verificar referencia");
         output.addView(label("Otras opciones por nombre · " + byText.size(), 19, GREEN, true));
         if (byText.isEmpty()) output.addView(label("No aparecieron alternativas adicionales por texto, o no se pudo identificar un nombre útil.", 13, MUTED, false));
