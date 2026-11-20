@@ -339,6 +339,7 @@ public class PhotoFinderActivity extends Activity {
         double price = offer.optDouble("price", 0);
         content.addView(label(price > 0 ? money(price) : "Precio no disponible", 16, TEXT, true));
         p.addView(label(subtitle, 12, MUTED, false));
+        if (offer.optBoolean("wholesale")) p.addView(label("Mayorista · verificar precio por caja, mínimo y transporte",12,MUTED,false));
         if (offer.optBoolean("out_of_stock")) p.addView(label("Agotado en la fuente", 12, 0xffffba7c, false));
         if (!offer.optString("url").isEmpty()) button(p, "Abrir artículo en tienda", () -> open(offer.optString("url")));
     }
